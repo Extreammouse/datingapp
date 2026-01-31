@@ -1,23 +1,29 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar, LogBox } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { NavigationContainer, DefaultTheme, useNavigation } from '@react-navigation/native';
+import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { COLORS } from './src/constants/theme';
 import { RootStackParamList } from './src/types';
 
+// Navigation
+import { BottomTabNavigator } from './src/navigation/BottomTabNavigator';
+
 // Screens
-import { HomeScreen } from './src/screens/HomeScreen';
 import { TugOfWarScreen } from './src/screens/TugOfWarScreen';
 import { SyncGridScreen } from './src/screens/SyncGridScreen';
 import { FrequencySyncScreen } from './src/screens/FrequencySyncScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
-import { MatchesListScreen } from './src/screens/MatchesListScreen';
 import { ChatScreenWrapper } from './src/screens/ChatScreenWrapper';
+import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
+import { GameSelectionScreen } from './src/screens/GameSelectionScreen';
 
 // Services
 import { staminaService } from './src/services/StaminaService';
 import { locationService } from './src/services/LocationService';
+import { databaseService } from './src/services/DatabaseService';
+import { dummyDataService } from './src/services/DummyDataService';
 
 // Ignore specific warnings
 LogBox.ignoreLogs([
@@ -28,7 +34,7 @@ LogBox.ignoreLogs([
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // Custom dark theme for navigation
-const ResonanceTheme = {
+const DatingAppTheme = {
   ...DefaultTheme,
   dark: true,
   colors: {
@@ -42,7 +48,22 @@ const ResonanceTheme = {
   },
 };
 
+// Main Tabs wrapper component
+const MainTabsScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const handleCenterPress = () => {
+    // Navigate to game selection when + button is pressed
+    navigation.navigate('GameSelection', { partnerId: 'demo_partner' });
+  };
+
+  return <BottomTabNavigator onCenterPress={handleCenterPress} />;
+};
+
 export default function App() {
+  const [isReady, setIsReady] = useState(false);
+  const [hasProfile, setHasProfile] = useState(false);
+
   useEffect(() => {
     // Initialize services on app start
     const initializeServices = async () => {
@@ -54,8 +75,22 @@ export default function App() {
         // Initialize location service for geofencing
         await locationService.initialize();
         console.log('[App] Location service initialized');
+
+        // Initialize database
+        await databaseService.initialize();
+        console.log('[App] Database initialized');
+
+        // Seed dummy users for testing
+        await dummyDataService.seedDummyUsers();
+        console.log('[App] Dummy users seeded');
+
+        // Check if user has profile
+        const profileExists = await databaseService.hasUserProfile();
+        setHasProfile(profileExists);
       } catch (error) {
         console.error('[App] Failed to initialize services:', error);
+      } finally {
+        setIsReady(true);
       }
     };
 
@@ -67,6 +102,10 @@ export default function App() {
     };
   }, []);
 
+  if (!isReady) {
+    return null; // Could show a splash screen here
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar
@@ -74,9 +113,9 @@ export default function App() {
         backgroundColor={COLORS.background}
         translucent={false}
       />
-      <NavigationContainer theme={ResonanceTheme}>
+      <NavigationContainer theme={DatingAppTheme}>
         <Stack.Navigator
-          initialRouteName="Home"
+          initialRouteName={hasProfile ? 'MainTabs' : 'ProfileSetup'}
           screenOptions={{
             headerShown: false,
             animation: 'slide_from_right',
@@ -86,19 +125,28 @@ export default function App() {
             },
           }}
         >
-          {/* Home Screen - Huddle Stack */}
+          {/* Profile Setup - First time user onboarding */}
           <Stack.Screen
-            name="Home"
-            component={HomeScreen}
+            name="ProfileSetup"
+            component={ProfileSetupScreen}
             options={{
               animation: 'fade',
             }}
           />
 
-          {/* Matches List - Chat with matches */}
+          {/* Main Tabs - Bottom tab navigation */}
           <Stack.Screen
-            name="MatchesList"
-            component={MatchesListScreen}
+            name="MainTabs"
+            component={MainTabsScreen}
+            options={{
+              animation: 'fade',
+            }}
+          />
+
+          {/* Settings Screen */}
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
             options={{
               animation: 'slide_from_right',
             }}
@@ -110,6 +158,16 @@ export default function App() {
             component={ChatScreenWrapper}
             options={{
               animation: 'slide_from_right',
+            }}
+          />
+
+          {/* Game Selection */}
+          <Stack.Screen
+            name="GameSelection"
+            component={GameSelectionScreen}
+            options={{
+              animation: 'slide_from_bottom',
+              presentation: 'modal',
             }}
           />
 
@@ -141,7 +199,7 @@ export default function App() {
             }}
           />
 
-          {/* Profile Screen */}
+          {/* Profile Screen (other user's profile) */}
           <Stack.Screen
             name="Profile"
             component={ProfileScreen}
@@ -154,4 +212,3 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
-

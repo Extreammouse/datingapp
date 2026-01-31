@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { Zap, Heart, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Zap, Heart, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS, ANIMATION, GAME } from '../../constants/theme';
 import { BioTag } from '../../types';
 import socketService from '../../services/SocketService';
@@ -34,7 +34,9 @@ interface TugOfWarProps {
     partnerId: string;
     partnerImage?: string;
     bioTags: BioTag[];
+    userGender?: 'male' | 'female' | 'other';
     onGameComplete: (won: boolean, revealedTags: BioTag[]) => void;
+    onOpenChat?: () => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -44,7 +46,9 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
     partnerId,
     partnerImage,
     bioTags,
+    userGender = 'other',
     onGameComplete,
+    onOpenChat,
 }) => {
     // Cord position: -1 (you win) to 1 (partner wins), 0 is center
     const cordPosition = useSharedValue(0);
@@ -55,6 +59,15 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
     const [revealedTags, setRevealedTags] = useState<BioTag[]>([]);
     const [milestoneReached, setMilestoneReached] = useState<number[]>([]);
     const [gameEnded, setGameEnded] = useState(false);
+    const [selectedDirection, setSelectedDirection] = useState<'left' | 'right' | null>(
+        userGender === 'male' ? 'left' : userGender === 'female' ? 'right' : null
+    );
+
+    // Determine pull direction based on gender:
+    // Male = left (pulling opponent towards them from right)
+    // Female = right (pulling opponent towards them from left)
+    // Other = user chooses
+    const pullDirection = selectedDirection;
 
     // Track which milestones have been triggered
     const checkMilestones = useCallback((position: number) => {
@@ -275,35 +288,39 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
                 </Text>
             </View>
 
-            {/* Tug buttons */}
-            <View style={styles.buttonContainer}>
-                <AnimatedPressable
-                    style={[styles.tugButton, styles.leftButton, leftButtonAnimatedStyle]}
-                    onPress={() => handleTug('left')}
-                    disabled={gameEnded}
-                >
-                    <ChevronLeft size={32} color={COLORS.neonCyan} />
-                    <ChevronLeft size={32} color={COLORS.neonCyan} style={styles.doubleArrow} />
-                    <Text style={[styles.buttonText, { color: COLORS.neonCyan }]}>PULL</Text>
-                </AnimatedPressable>
+            {/* Single Pull Button - Tap rapidly to pull them towards you */}
+            <AnimatedPressable
+                style={[styles.pullButton, leftButtonAnimatedStyle]}
+                onPress={() => handleTug('left')}
+                disabled={gameEnded}
+            >
+                <View style={styles.pullButtonInner}>
+                    <ChevronLeft size={40} color={COLORS.neonCyan} />
+                    <ChevronLeft size={40} color={COLORS.neonCyan} style={styles.doubleArrowLarge} />
+                    <Text style={styles.pullButtonText}>PULL</Text>
+                </View>
+                <Text style={styles.pullHint}>Tap rapidly to pull them to you!</Text>
+            </AnimatedPressable>
 
-                <AnimatedPressable
-                    style={[styles.tugButton, styles.rightButton, rightButtonAnimatedStyle]}
-                    onPress={() => handleTug('right')}
-                    disabled={gameEnded}
-                >
-                    <ChevronRight size={32} color={COLORS.electricMagenta} />
-                    <ChevronRight size={32} color={COLORS.electricMagenta} style={styles.doubleArrow} />
-                    <Text style={[styles.buttonText, { color: COLORS.electricMagenta }]}>PULL</Text>
-                </AnimatedPressable>
-            </View>
-
-            {/* Game ended overlay */}
+            {/* Game ended overlay with Open Chat button */}
             {gameEnded && (
                 <View style={styles.overlay}>
                     <Text style={styles.overlayText}>
                         {cordPosition.value < 0 ? '🎉 You Won!' : 'They Won!'}
                     </Text>
+                    <Text style={styles.overlaySubtext}>
+                        {revealedTags.length} tags revealed
+                    </Text>
+                    <Pressable
+                        style={styles.connectButton}
+                        onPress={() => {
+                            onGameComplete(cordPosition.value < 0, revealedTags);
+                            if (onOpenChat) onOpenChat();
+                        }}
+                    >
+                        <MessageCircle size={20} color={COLORS.background} />
+                        <Text style={styles.connectButtonText}>Open Chat</Text>
+                    </Pressable>
                 </View>
             )}
         </View>
@@ -451,15 +468,65 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginTop: SPACING.xs,
     },
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    // New single pull button styles
+    pullButton: {
+        width: 180,
+        height: 120,
+        borderRadius: BORDER_RADIUS.xl,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        borderWidth: 3,
+        borderColor: COLORS.neonCyan,
+    },
+    pullButtonInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    doubleArrowLarge: {
+        marginLeft: -24,
+    },
+    pullButtonText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: COLORS.neonCyan,
+        marginLeft: SPACING.sm,
+    },
+    pullHint: {
+        color: COLORS.textMuted,
+        fontSize: 12,
+        marginTop: SPACING.sm,
+    },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: SPACING.md,
     },
     overlayText: {
         color: COLORS.textPrimary,
         fontSize: 32,
+        fontWeight: 'bold',
+    },
+    overlaySubtext: {
+        color: COLORS.textSecondary,
+        fontSize: 16,
+    },
+    connectButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        paddingHorizontal: SPACING.xl,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.electricMagenta,
+        borderRadius: BORDER_RADIUS.full,
+        marginTop: SPACING.lg,
+    },
+    connectButtonText: {
+        color: COLORS.background,
+        fontSize: 18,
         fontWeight: 'bold',
     },
 });

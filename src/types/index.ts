@@ -74,13 +74,18 @@ export interface GameRecord {
 
 // Navigation types
 export type RootStackParamList = {
+    ProfileSetup: undefined;
+    MainTabs: undefined;
     Home: undefined;
+    MyProfile: undefined;
+    Settings: undefined;
     MatchesList: undefined;
     Chat: { matchId: string; matchName: string; matchImage?: string };
     TugOfWar: { roomId: string; partnerId: string };
     SyncGrid: { roomId: string; partnerId: string };
     FrequencySync: { roomId: string; partnerId: string };
     Profile: { userId: string; revealed: boolean };
+    GameSelection: { partnerId: string };
 };
 
 // Socket event types

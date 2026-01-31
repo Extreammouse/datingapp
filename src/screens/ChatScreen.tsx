@@ -9,6 +9,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Image,
+    SafeAreaView,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -19,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Send, ArrowLeft, Heart, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { COLORS, SPACING, BORDER_RADIUS, ANIMATION } from '../constants/theme';
+import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import socketService from '../services/SocketService';
 
 export interface Message {
@@ -129,18 +130,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
     // Socket connection for real-time chat
     useEffect(() => {
-        // Join chat room
         socketService.joinRoom(`chat_${matchId}`);
-
-        // Listen for incoming messages
-        const handleMessage = (data: Message) => {
-            setMessages((prev) => [...prev, data]);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        };
-
-        // In production, you'd subscribe to socket events here
-        // socketService.onMessage(handleMessage);
-
         return () => {
             socketService.leaveRoom();
         };
@@ -161,7 +151,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // Animate send button
         sendButtonScale.value = withSpring(0.8, { damping: 10 }, () => {
             sendButtonScale.value = withSpring(1);
         });
@@ -176,9 +165,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
         setMessages((prev) => [...prev, newMessage]);
         setInputText('');
-
-        // In production: send via socket
-        // socketService.sendMessage(matchId, newMessage);
     }, [inputText, currentUserId, sendButtonScale]);
 
     // Send reaction
@@ -196,8 +182,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
         setMessages((prev) => [...prev, reactionMessage]);
         setShowReactions(false);
-
-        // In production: send via socket
     }, [currentUserId]);
 
     // Animated styles
@@ -228,103 +212,109 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-            {/* Header */}
-            <View style={styles.header}>
-                <Pressable onPress={onBack} style={styles.backButton}>
-                    <ArrowLeft size={24} color={COLORS.textPrimary} />
-                </Pressable>
+        <SafeAreaView style={styles.safeArea}>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <Pressable onPress={onBack} style={styles.backButton}>
+                        <ArrowLeft size={24} color={COLORS.textPrimary} />
+                    </Pressable>
 
-                <View style={styles.headerInfo}>
-                    {matchImage ? (
-                        <Image source={{ uri: matchImage }} style={styles.headerAvatar} />
-                    ) : (
-                        <View style={styles.headerAvatarPlaceholder}>
-                            <Heart size={16} color={COLORS.electricMagenta} />
+                    <View style={styles.headerInfo}>
+                        {matchImage ? (
+                            <Image source={{ uri: matchImage }} style={styles.headerAvatar} />
+                        ) : (
+                            <View style={styles.headerAvatarPlaceholder}>
+                                <Heart size={16} color={COLORS.electricMagenta} />
+                            </View>
+                        )}
+                        <View>
+                            <Text style={styles.headerName}>{matchName}</Text>
+                            <Text style={styles.headerStatus}>Online</Text>
                         </View>
-                    )}
-                    <View>
-                        <Text style={styles.headerName}>{matchName}</Text>
-                        <Text style={styles.headerStatus}>Online</Text>
                     </View>
+
+                    <View style={styles.placeholder} />
                 </View>
 
-                <View style={styles.placeholder} />
-            </View>
-
-            {/* Messages */}
-            <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={renderMessage}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={styles.messagesList}
-                showsVerticalScrollIndicator={false}
-            />
-
-            {/* Quick Reactions */}
-            {showReactions && (
-                <Animated.View
-                    entering={FadeInDown.duration(200)}
-                    style={styles.reactionsContainer}
-                >
-                    {QUICK_REACTIONS.map((emoji) => (
-                        <Pressable
-                            key={emoji}
-                            style={styles.reactionButton}
-                            onPress={() => handleReaction(emoji)}
-                        >
-                            <Text style={styles.reactionButtonEmoji}>{emoji}</Text>
-                        </Pressable>
-                    ))}
-                </Animated.View>
-            )}
-
-            {/* Input */}
-            <Animated.View style={[styles.inputContainer, inputContainerStyle]}>
-                <Pressable
-                    style={styles.reactionToggle}
-                    onPress={() => setShowReactions(!showReactions)}
-                >
-                    <Text style={styles.reactionToggleText}>😊</Text>
-                </Pressable>
-
-                <TextInput
-                    style={styles.input}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder="Type a message..."
-                    placeholderTextColor={COLORS.textMuted}
-                    multiline
-                    maxLength={500}
-                    onFocus={() => {
-                        inputFocused.value = withTiming(1, { duration: 200 });
-                        setShowReactions(false);
-                    }}
-                    onBlur={() => {
-                        inputFocused.value = withTiming(0, { duration: 200 });
-                    }}
+                {/* Messages */}
+                <FlatList
+                    ref={flatListRef}
+                    data={messages}
+                    renderItem={renderMessage}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.messagesList}
+                    showsVerticalScrollIndicator={false}
                 />
 
-                <AnimatedPressable
-                    style={[styles.sendButton, sendButtonStyle]}
-                    onPress={handleSend}
-                    disabled={!inputText.trim()}
-                >
-                    <Send
-                        size={20}
-                        color={inputText.trim() ? COLORS.neonCyan : COLORS.textMuted}
+                {/* Quick Reactions */}
+                {showReactions && (
+                    <Animated.View
+                        entering={FadeInDown.duration(200)}
+                        style={styles.reactionsContainer}
+                    >
+                        {QUICK_REACTIONS.map((emoji) => (
+                            <Pressable
+                                key={emoji}
+                                style={styles.reactionButton}
+                                onPress={() => handleReaction(emoji)}
+                            >
+                                <Text style={styles.reactionButtonEmoji}>{emoji}</Text>
+                            </Pressable>
+                        ))}
+                    </Animated.View>
+                )}
+
+                {/* Input */}
+                <Animated.View style={[styles.inputContainer, inputContainerStyle]}>
+                    <Pressable
+                        style={styles.reactionToggle}
+                        onPress={() => setShowReactions(!showReactions)}
+                    >
+                        <Text style={styles.reactionToggleText}>😊</Text>
+                    </Pressable>
+
+                    <TextInput
+                        style={styles.input}
+                        value={inputText}
+                        onChangeText={setInputText}
+                        placeholder="Type a message..."
+                        placeholderTextColor={COLORS.textMuted}
+                        multiline
+                        maxLength={500}
+                        onFocus={() => {
+                            inputFocused.value = withTiming(1, { duration: 200 });
+                            setShowReactions(false);
+                        }}
+                        onBlur={() => {
+                            inputFocused.value = withTiming(0, { duration: 200 });
+                        }}
                     />
-                </AnimatedPressable>
-            </Animated.View>
-        </KeyboardAvoidingView>
+
+                    <AnimatedPressable
+                        style={[styles.sendButton, sendButtonStyle]}
+                        onPress={handleSend}
+                        disabled={!inputText.trim()}
+                    >
+                        <Send
+                            size={20}
+                            color={inputText.trim() ? COLORS.neonCyan : COLORS.textMuted}
+                        />
+                    </AnimatedPressable>
+                </Animated.View>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
     container: {
         flex: 1,
         backgroundColor: COLORS.background,

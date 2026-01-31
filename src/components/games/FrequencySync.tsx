@@ -39,6 +39,57 @@ const KNOB_SIZE = 40;
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 
+// Individual Particle Component to manage its own animation state
+const Particle: React.FC<{ index: number; show: boolean; delay: number }> = React.memo(({ index, show, delay }) => {
+    const x = useSharedValue(WAVE_WIDTH / 2);
+    const y = useSharedValue(WAVE_HEIGHT / 2);
+    const opacity = useSharedValue(0);
+    const scale = useSharedValue(0);
+
+    useEffect(() => {
+        if (show) {
+            const angle = (index / 20) * Math.PI * 2;
+            const distance = 100 + Math.random() * 100;
+
+            x.value = WAVE_WIDTH / 2;
+            y.value = WAVE_HEIGHT / 2;
+            opacity.value = 1;
+            scale.value = 0;
+
+            setTimeout(() => {
+                x.value = withSpring(
+                    WAVE_WIDTH / 2 + Math.cos(angle) * distance,
+                    { damping: 8, stiffness: 100 }
+                );
+                y.value = withSpring(
+                    WAVE_HEIGHT / 2 + Math.sin(angle) * distance,
+                    { damping: 8, stiffness: 100 }
+                );
+                scale.value = withSequence(
+                    withSpring(1.5, ANIMATION.springBouncy),
+                    withTiming(0, { duration: 800 })
+                );
+                opacity.value = withTiming(0, { duration: 1000 });
+            }, delay);
+        }
+    }, [show, index, delay]);
+
+    const style = useAnimatedStyle(() => ({
+        transform: [
+            { translateX: x.value },
+            { translateY: y.value },
+            { scale: scale.value },
+        ],
+        opacity: opacity.value,
+    }));
+
+    return (
+        <Animated.View style={[styles.particle, style]}>
+            <Zap size={12} color={index % 2 === 0 ? COLORS.neonCyan : COLORS.electricMagenta} />
+        </Animated.View>
+    );
+});
+
 interface FrequencySyncProps {
     roomId: string;
     partnerId: string;
@@ -70,22 +121,40 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
 
     // Particle explosion state
     const [showParticles, setShowParticles] = useState(false);
-    const particleAnimations = useRef(
-        Array.from({ length: 20 }, () => ({
-            x: useSharedValue(WAVE_WIDTH / 2),
-            y: useSharedValue(WAVE_HEIGHT / 2),
-            opacity: useSharedValue(0),
-            scale: useSharedValue(0),
-        }))
-    ).current;
 
-    // Start wave animation
+    // Wave paths (updated on JS thread)
+    const [myWavePath, setMyWavePath] = useState('');
+    const [partnerWavePath, setPartnerWavePath] = useState('');
+    const wavePhaseRef = useRef(0);
+
+    // Generate wave path helper (runs on JS thread)
+    const generateWavePath = (value: number, phase: number): string => {
+        const amplitude = 30 + value * 40;
+        const frequency = 2 + value * 3;
+
+        let path = `M 0 ${WAVE_HEIGHT / 2}`;
+
+        for (let x = 0; x <= WAVE_WIDTH; x += 5) {
+            const y = WAVE_HEIGHT / 2 +
+                Math.sin((x / WAVE_WIDTH) * Math.PI * frequency + phase) * amplitude;
+            path += ` L ${x} ${y}`;
+        }
+
+        return path;
+    };
+
+    // Wave animation using interval (runs on JS thread to avoid worklet issues)
     useEffect(() => {
-        wavePhase.value = withRepeat(
-            withTiming(Math.PI * 2, { duration: 2000 }),
-            -1,
-            false
-        );
+        const interval = setInterval(() => {
+            wavePhaseRef.current += 0.1;
+            if (wavePhaseRef.current > Math.PI * 2) {
+                wavePhaseRef.current = 0;
+            }
+            setMyWavePath(generateWavePath(myValue.value, wavePhaseRef.current));
+            setPartnerWavePath(generateWavePath(partnerValue.value, wavePhaseRef.current + Math.PI));
+        }, 50); // 20 FPS for wave animation
+
+        return () => clearInterval(interval);
     }, []);
 
     // Check sync state
@@ -147,30 +216,6 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
     // Trigger particle explosion ("shatter" effect)
     const triggerParticleExplosion = useCallback(() => {
         setShowParticles(true);
-
-        particleAnimations.forEach((particle, i) => {
-            const angle = (i / particleAnimations.length) * Math.PI * 2;
-            const distance = 100 + Math.random() * 100;
-
-            particle.x.value = WAVE_WIDTH / 2;
-            particle.y.value = WAVE_HEIGHT / 2;
-            particle.opacity.value = 1;
-            particle.scale.value = 0;
-
-            particle.x.value = withSpring(
-                WAVE_WIDTH / 2 + Math.cos(angle) * distance,
-                { damping: 8, stiffness: 100 }
-            );
-            particle.y.value = withSpring(
-                WAVE_HEIGHT / 2 + Math.sin(angle) * distance,
-                { damping: 8, stiffness: 100 }
-            );
-            particle.scale.value = withSequence(
-                withSpring(1.5, ANIMATION.springBouncy),
-                withTiming(0, { duration: 800 })
-            );
-            particle.opacity.value = withTiming(0, { duration: 1000 });
-        });
     }, []);
 
     // Handle socket events
@@ -202,6 +247,11 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
         };
     }, [roomId, checkSync, triggerParticleExplosion]);
 
+    // Helper to send frequency update (must run on JS thread)
+    const sendFrequencyUpdate = (value: number) => {
+        socketService.sendFrequencyUpdate(value);
+    };
+
     // Slider gesture
     const sliderGesture = Gesture.Pan()
         .onUpdate((e) => {
@@ -209,49 +259,10 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
             const value = x / (SLIDER_WIDTH - KNOB_SIZE);
             myValue.value = value;
 
-            // Send to server
-            socketService.sendFrequencyUpdate(value);
+            // Send to server (must run on JS thread)
+            runOnJS(sendFrequencyUpdate)(value);
             runOnJS(checkSync)(value, partnerValue.value);
         });
-
-    // Generate wave path based on slider value
-    const generateWavePath = (value: number, phase: number): string => {
-        const amplitude = 30 + value * 40; // Amplitude increases with value
-        const frequency = 2 + value * 3; // Frequency increases with value
-
-        let path = `M 0 ${WAVE_HEIGHT / 2}`;
-
-        for (let x = 0; x <= WAVE_WIDTH; x += 5) {
-            const y = WAVE_HEIGHT / 2 +
-                Math.sin((x / WAVE_WIDTH) * Math.PI * frequency + phase) * amplitude;
-            path += ` L ${x} ${y}`;
-        }
-
-        return path;
-    };
-
-    // Animated wave path
-    const waveAnimatedProps = useAnimatedProps(() => {
-        const path = generateWavePath(myValue.value, wavePhase.value);
-        return { d: path };
-    });
-
-    // Partner wave path (slightly offset)
-    const partnerWaveAnimatedProps = useAnimatedProps(() => {
-        const path = generateWavePath(partnerValue.value, wavePhase.value + Math.PI);
-        return { d: path };
-    });
-
-    // Wave color based on slider value (cold blue to warm rose)
-    const waveColorStyle = useAnimatedStyle(() => {
-        const color = interpolateColor(
-            myValue.value,
-            [0, 0.5, 1],
-            [COLORS.frequencyCold, COLORS.neonCyan, COLORS.frequencyWarm]
-        );
-
-        return { color };
-    });
 
     // Slider knob position
     const knobAnimatedStyle = useAnimatedStyle(() => {
@@ -267,6 +278,7 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
             backgroundColor,
         };
     });
+
 
     // Slider track gradient
     const sliderTrackStyle = useDerivedValue(() => {
@@ -339,8 +351,8 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
                     </Defs>
 
                     {/* Partner wave (behind) */}
-                    <AnimatedPath
-                        animatedProps={partnerWaveAnimatedProps}
+                    <Path
+                        d={partnerWavePath}
                         stroke={COLORS.electricMagentaDim}
                         strokeWidth={3}
                         fill="none"
@@ -348,8 +360,8 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
                     />
 
                     {/* My wave (front) */}
-                    <AnimatedPath
-                        animatedProps={waveAnimatedProps}
+                    <Path
+                        d={myWavePath}
                         stroke="url(#waveGradient)"
                         strokeWidth={4}
                         fill="none"
@@ -357,26 +369,15 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
                     />
                 </Svg>
 
-                {/* Particle explosion */}
-                {showParticles && particleAnimations.map((particle, i) => {
-                    const particleStyle = useAnimatedStyle(() => ({
-                        transform: [
-                            { translateX: particle.x.value },
-                            { translateY: particle.y.value },
-                            { scale: particle.scale.value },
-                        ],
-                        opacity: particle.opacity.value,
-                    }));
-
-                    return (
-                        <Animated.View
-                            key={i}
-                            style={[styles.particle, particleStyle]}
-                        >
-                            <Zap size={12} color={i % 2 === 0 ? COLORS.neonCyan : COLORS.electricMagenta} />
-                        </Animated.View>
-                    );
-                })}
+                {/* Particle explosion - Using extracted Component */}
+                {Array.from({ length: 20 }).map((_, i) => (
+                    <Particle
+                        key={i}
+                        index={i}
+                        show={showParticles}
+                        delay={0}
+                    />
+                ))}
             </View>
 
             {/* Frequency indicator */}

@@ -7,7 +7,7 @@ import {
     StatusBar,
     Pressable,
 } from 'react-native';
-import { Zap, Battery, Clock, MessageCircle } from 'lucide-react-native';
+import { Zap, Battery, Clock, MessageCircle, User as UserIcon } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { User, GameType } from '../types';
 import { HuddleStack } from '../components/HuddleStack';
@@ -125,10 +125,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.logoContainer}>
                     <Zap size={28} color={COLORS.neonCyan} />
-                    <Text style={styles.logoText}>Resonance</Text>
+                    <Text style={styles.logoText}>Dating App</Text>
                 </View>
 
                 <View style={styles.headerRight}>
+                    {/* Profile button */}
+                    <Pressable
+                        style={styles.profileButton}
+                        onPress={() => navigation.navigate('MyProfile')}
+                    >
+                        <UserIcon size={24} color={COLORS.neonCyan} />
+                    </Pressable>
+
                     {/* Messages button */}
                     <Pressable
                         style={styles.messagesButton}
@@ -214,6 +222,9 @@ const styles = StyleSheet.create({
         gap: SPACING.md,
     },
     messagesButton: {
+        padding: SPACING.sm,
+    },
+    profileButton: {
         padding: SPACING.sm,
     },
     staminaContainer: {

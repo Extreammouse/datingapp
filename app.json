@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Resonance",
-    "slug": "resonance",
+    "name": "Dating App",
+    "slug": "datingapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,8 +16,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.resonance.dating",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Resonance needs your location to find matches nearby.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Resonance uses your location in the background to notify you when a match is nearby.",
+        "NSLocationWhenInUseUsageDescription": "Dating App needs your location to find matches nearby.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Dating App uses your location in the background to notify you when a match is nearby.",
         "UIBackgroundModes": [
           "location",
           "fetch"
@@ -46,11 +46,12 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Resonance uses your location to find matches nearby and notify you when someone special is close.",
+          "locationAlwaysAndWhenInUsePermission": "Dating App uses your location to find matches nearby and notify you when someone special is close.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "expo-sqlite"
     ]
   }
 }
