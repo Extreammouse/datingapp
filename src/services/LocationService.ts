@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Haptics from 'expo-haptics';
 import { GAME, COLORS } from '../constants/theme';
+import { firestoreFragmentService, PhotoFragment } from './FirestoreFragmentService';
 
 const LOCATION_TASK_NAME = 'resonance-background-location';
 
@@ -17,7 +18,10 @@ class LocationService {
     private currentLocation: Location.LocationObject | null = null;
     private nearbyUsers: UserLocation[] = [];
     private proximityCallbacks: Set<(userId: string, distance: number) => void> = new Set();
+    private fragmentProximityCallbacks: Set<(fragment: PhotoFragment) => void> = new Set();
+    private nearbyFragments: Set<string> = new Set(); // Track which fragments we've already notified about
     private heartbeatInterval: NodeJS.Timeout | null = null;
+    private fragmentCheckInterval: NodeJS.Timeout | null = null;
 
     /**
      * Initialize location service and request permissions

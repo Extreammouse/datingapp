@@ -7,9 +7,11 @@ import {
     ActivityIndicator,
     Alert,
     Image,
+    Switch,
+    Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_DEFAULT, Polyline } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_DEFAULT, Polyline, Circle } from 'react-native-maps';
 import { useResonanceStore } from '../store/useResonanceStore';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, FONTS } from '../constants/theme';
 import { Fragment, ResonanceProfile } from '../types';
@@ -22,6 +24,15 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { Navigation, Gamepad2, User, Camera, Music, Hash, Zap } from 'lucide-react-native';
+import { PhotoFragment } from '../services/FirestoreFragmentService';
+import { fragmentGeofenceService } from '../services/FragmentGeofenceService';
+import { FragmentCollectionModal } from './FragmentCollectionModal';
+import { DemoModeToggle } from '../components/DemoModeToggle';
+import { firestoreFragmentService } from '../services/FirestoreFragmentService';
+import { locationService } from '../services/LocationService';
+import { fragmentDropService } from '../services/FragmentDropService';
+
+
 
 const INITIAL_REGION = {
     latitude: 42.3601,
@@ -95,21 +106,65 @@ export const MapScreen: React.FC = ({ navigation }: any) => {
     const [loading, setLoading] = useState(true);
     const [userLoc, setUserLoc] = useState(INITIAL_REGION);
 
-    // Simulate walking
+    // Demo mode toggle
+    const [isDemoMode, setIsDemoMode] = useState(true);
+    const [realFragments, setRealFragments] = useState<PhotoFragment[]>([]);
+    const [selectedFragment, setSelectedFragment] = useState<PhotoFragment | null>(null);
+    const [showCollectionModal, setShowCollectionModal] = useState(false);
+
+    // Simulate walking (DEMO MODE ONLY)
     useEffect(() => {
         setTimeout(() => setLoading(false), 1500);
 
-        let pathIndex = 0;
-        const interval = setInterval(() => {
-            if (pathIndex < MOCK_PATH.length) {
-                const nextPoint = MOCK_PATH[pathIndex];
-                setUserLoc(prev => ({ ...prev, latitude: nextPoint.latitude, longitude: nextPoint.longitude }));
-                pathIndex = (pathIndex + 1) % MOCK_PATH.length; // Loop walking
-            }
-        }, 3000);
+        if (isDemoMode) {
+            let pathIndex = 0;
+            const interval = setInterval(() => {
+                if (pathIndex < MOCK_PATH.length) {
+                    const nextPoint = MOCK_PATH[pathIndex];
+                    setUserLoc(prev => ({ ...prev, latitude: nextPoint.latitude, longitude: nextPoint.longitude }));
+                    pathIndex = (pathIndex + 1) % MOCK_PATH.length;
+                }
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [isDemoMode]);
 
-        return () => clearInterval(interval);
-    }, []);
+
+    // Load real fragments when not in demo mode
+    useEffect(() => {
+        const loadRealFragments = async () => {
+            try {
+                const fragments = await fragmentGeofenceService.getFragmentsForMap(1);
+                setRealFragments(fragments);
+                console.log(`[MapScreen] Loaded ${fragments.length} real fragments`);
+            } catch (error) {
+                console.error("[MapScreen] Error loading fragments:", error);
+            }
+        };
+
+        if (!isDemoMode) {
+            // Start real location tracking
+            locationService.startTracking();
+            locationService.getCurrentLocation().then(loc => {
+                if (loc) {
+                    setUserLoc({
+                        latitude: loc.coords.latitude,
+                        longitude: loc.coords.longitude,
+                        latitudeDelta: 0.005,
+                        longitudeDelta: 0.005,
+                    });
+                }
+            });
+
+            loadRealFragments();
+            fragmentGeofenceService.start();
+
+            return () => {
+                fragmentGeofenceService.stop();
+            };
+        }
+    }, [isDemoMode]);
+
 
     const handleFragmentPress = (profile: ResonanceProfile, fragment: Fragment) => {
         // Simple geofence check (mock)
@@ -174,7 +229,8 @@ export const MapScreen: React.FC = ({ navigation }: any) => {
                 initialRegion={INITIAL_REGION}
                 region={userLoc}
                 customMapStyle={DARK_MAP_STYLE}
-                showsUserLocation={false}
+                showsUserLocation={true}
+                showsMyLocationButton={true}
             >
                 {/* User Marker (Self) */}
                 <Marker coordinate={userLoc}>
@@ -182,6 +238,16 @@ export const MapScreen: React.FC = ({ navigation }: any) => {
                         <View style={styles.userMarkerIn} />
                     </View>
                 </Marker>
+
+                {/* Geofence Circle - 50m Collection Radius */}
+                <Circle
+                    center={userLoc}
+                    radius={50}
+                    strokeColor="rgba(0, 255, 255, 0.5)"
+                    fillColor="rgba(0, 255, 255, 0.1)"
+                    strokeWidth={2}
+                />
+
 
                 {/* Trail Logic - Show where "User" has been (Mock) */}
                 <Polyline
@@ -216,6 +282,13 @@ export const MapScreen: React.FC = ({ navigation }: any) => {
             <View style={styles.footerOverlay}>
                 <Text style={styles.footerText}>Walk near fragments to collect shards.</Text>
             </View>
+
+            {/* Demo Mode Toggle */}
+            <DemoModeToggle
+                isDemoMode={isDemoMode}
+                onToggle={setIsDemoMode}
+            />
+
         </View>
     );
 };
