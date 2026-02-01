@@ -11,6 +11,8 @@ import { RootStackParamList } from './src/types';
 import { BottomTabNavigator } from './src/navigation/BottomTabNavigator';
 
 // Screens
+import { LoginScreen } from './src/screens/LoginScreen';
+import { SignupScreen } from './src/screens/SignupScreen';
 import { TugOfWarScreen } from './src/screens/TugOfWarScreen';
 import { SyncGridScreen } from './src/screens/SyncGridScreen';
 import { FrequencySyncScreen } from './src/screens/FrequencySyncScreen';
@@ -22,6 +24,7 @@ import { GameWrapperScreen } from './src/screens/GameWrapperScreen';
 import { GameGauntletScreen } from './src/screens/GameGauntletScreen';
 
 // Services
+import { firebaseAuthService } from './src/services/FirebaseAuthService';
 import { staminaService } from './src/services/StaminaService';
 import { locationService } from './src/services/LocationService';
 import { databaseService } from './src/services/DatabaseService';
@@ -58,6 +61,21 @@ const MainTabsScreen: React.FC = () => {
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    // Initialize Firebase auth and listen to auth state
+    firebaseAuthService.initialize();
+
+    const unsubscribe = firebaseAuthService.onAuthStateChange((user) => {
+      setIsAuthenticated(!!user);
+      setAuthChecked(true);
+      console.log('[App] Auth state:', user ? 'Authenticated' : 'Not authenticated');
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     // Initialize services on app start
@@ -97,7 +115,7 @@ export default function App() {
     };
   }, []);
 
-  if (!isReady) {
+  if (!isReady || !authChecked) {
     return null; // Could show a splash screen here
   }
 
@@ -111,7 +129,6 @@ export default function App() {
         />
         <NavigationContainer theme={DatingAppTheme}>
           <Stack.Navigator
-            initialRouteName={hasProfile ? 'MainTabs' : 'ProfileSetup'}
             screenOptions={{
               headerShown: false,
               animation: 'slide_from_right',
@@ -121,98 +138,122 @@ export default function App() {
               },
             }}
           >
-            {/* Profile Setup - First time user onboarding */}
-            <Stack.Screen
-              name="ProfileSetup"
-              component={ProfileSetupScreen}
-              options={{
-                animation: 'fade',
-              }}
-            />
+            {!isAuthenticated ? (
+              // Auth Stack - Show when NOT authenticated
+              <>
+                <Stack.Screen
+                  name="Login"
+                  component={LoginScreen}
+                  options={{
+                    animation: 'fade',
+                  }}
+                />
 
-            {/* Main Tabs - Bottom tab navigation */}
-            <Stack.Screen
-              name="MainTabs"
-              component={MainTabsScreen}
-              options={{
-                animation: 'fade',
-              }}
-            />
+                <Stack.Screen
+                  name="Signup"
+                  component={SignupScreen}
+                  options={{
+                    animation: 'slide_from_right',
+                  }}
+                />
+              </>
+            ) : (
+              // App Stack - Show when authenticated
+              <>
+                {/* Profile Setup - First time user onboarding */}
+                <Stack.Screen
+                  name="ProfileSetup"
+                  component={ProfileSetupScreen}
+                  options={{
+                    animation: 'fade',
+                  }}
+                />
 
-            {/* Settings Screen */}
-            <Stack.Screen
-              name="Settings"
-              component={SettingsScreen}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
+                {/* Main Tabs - Bottom tab navigation */}
+                <Stack.Screen
+                  name="MainTabs"
+                  component={MainTabsScreen}
+                  options={{
+                    animation: 'fade',
+                  }}
+                />
 
-            {/* Chat Screen */}
-            <Stack.Screen
-              name="Chat"
-              component={ChatScreenWrapper}
-              options={{
-                animation: 'slide_from_right',
-              }}
-            />
+                {/* Settings Screen */}
+                <Stack.Screen
+                  name="Settings"
+                  component={SettingsScreen}
+                  options={{
+                    animation: 'slide_from_right',
+                  }}
+                />
 
-            {/* Game Selection / Wrapper */}
-            <Stack.Screen
-              name="GameSelection"
-              component={GameWrapperScreen}
-              options={{
-                animation: 'slide_from_bottom',
-                presentation: 'modal',
-              }}
-            />
+                {/* Chat Screen */}
+                <Stack.Screen
+                  name="Chat"
+                  component={ChatScreenWrapper}
+                  options={{
+                    animation: 'slide_from_right',
+                  }}
+                />
 
-            {/* Game Screens */}
-            <Stack.Screen
-              name="TugOfWar"
-              component={TugOfWarScreen}
-              options={{
-                animation: 'slide_from_bottom',
-                gestureEnabled: false, // Prevent accidental back during game
-              }}
-            />
+                {/* Game Selection / Wrapper */}
+                <Stack.Screen
+                  name="GameSelection"
+                  component={GameWrapperScreen}
+                  options={{
+                    animation: 'slide_from_bottom',
+                    presentation: 'modal',
+                  }}
+                />
 
-            <Stack.Screen
-              name="SyncGrid"
-              component={SyncGridScreen}
-              options={{
-                animation: 'slide_from_bottom',
-                gestureEnabled: false,
-              }}
-            />
+                {/* Game Screens */}
+                <Stack.Screen
+                  name="TugOfWar"
+                  component={TugOfWarScreen}
+                  options={{
+                    animation: 'slide_from_bottom',
+                    gestureEnabled: false, // Prevent accidental back during game
+                  }}
+                />
 
-            <Stack.Screen
-              name="FrequencySync"
-              component={FrequencySyncScreen}
-              options={{
-                animation: 'slide_from_bottom',
-                gestureEnabled: false,
-              }}
-            />
+                <Stack.Screen
+                  name="SyncGrid"
+                  component={SyncGridScreen}
+                  options={{
+                    animation: 'slide_from_bottom',
+                    gestureEnabled: false,
+                  }}
+                />
 
-            {/* Game Gauntlet */}
-            <Stack.Screen
-              name="GameGauntlet"
-              component={GameGauntletScreen}
-              options={{
-                animation: 'fade',
-                gestureEnabled: false,
-              }}
-            />
+                <Stack.Screen
+                  name="FrequencySync"
+                  component={FrequencySyncScreen}
+                  options={{
+                    animation: 'slide_from_bottom',
+                    gestureEnabled: false,
+                  }}
+                />
 
-            {/* Profile Screen (other user's profile) */}
-            <Stack.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{
-                animation: 'fade_from_bottom',
-              }}
-            />
+                {/* Game Gauntlet */}
+                <Stack.Screen
+                  name="GameGauntlet"
+                  component={GameGauntletScreen}
+                  options={{
+                    animation: 'fade',
+                    gestureEnabled: false,
+                  }}
+                />
+
+                {/* Profile Screen (other user's profile) */}
+                <Stack.Screen
+                  name="Profile"
+                  component={ProfileScreen}
+                  options={{
+                    animation: 'fade_from_bottom',
+                  }}
+                />
+              </>
+            )}
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

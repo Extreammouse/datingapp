@@ -51,7 +51,8 @@
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-web-browser"
     ]
   }
 }

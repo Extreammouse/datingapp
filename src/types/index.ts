@@ -74,6 +74,8 @@ export interface GameRecord {
 
 // Navigation types
 export type RootStackParamList = {
+    Login: undefined;
+    Signup: undefined;
     ProfileSetup: { isEditing?: boolean } | undefined;
     MainTabs: undefined;
     Home: undefined;
