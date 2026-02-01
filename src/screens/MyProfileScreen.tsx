@@ -1,15 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    SafeAreaView,
-    ScrollView,
-    Image,
-    Pressable,
-} from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, Image, Pressable } from 'react-native';
 import { ArrowLeft, Camera, Edit3, Settings } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+
 import { RootStackParamList } from '../types';
 import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import { databaseService, UserProfile } from '../services/DatabaseService';
@@ -22,9 +16,11 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadProfile();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            loadProfile();
+        }, [])
+    );
 
     const loadProfile = async () => {
         try {
@@ -40,7 +36,7 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
 
     const handleEditProfile = () => {
         // Navigate to profile setup to edit
-        navigation.navigate('ProfileSetup');
+        navigation.navigate('ProfileSetup', { isEditing: true });
     };
 
     const handleSettings = () => {

@@ -1,42 +1,44 @@
-// Midnight Tech-Noir Theme for Resonance
+// Professional Monochrome Theme for Resonance
 export const COLORS = {
-  // Core backgrounds
-  background: '#0A0A0A',
-  surface: '#141414',
-  surfaceLight: '#1E1E1E',
-  surfaceGlass: 'rgba(20, 20, 20, 0.8)',
+  // Core backgrounds (Professional White/Black)
+  background: '#FFFFFF',
+  surface: '#F8F9FA',
+  surfaceLight: '#E9ECEF',
+  surfaceGlass: 'rgba(248, 249, 250, 0.9)',
 
-  // Accent colors
-  neonCyan: '#00FFFF',
-  neonCyanDim: 'rgba(0, 255, 255, 0.3)',
-  electricMagenta: '#FF00FF',
-  electricMagentaDim: 'rgba(255, 0, 255, 0.3)',
-
-  // Gradients
-  gradientCyan: ['#00FFFF', '#0088FF'],
-  gradientMagenta: ['#FF00FF', '#FF0088'],
-  gradientCyanToMagenta: ['#00FFFF', '#FF00FF'],
-
-  // Frequency Sync gradient (cold blue to warm rose)
-  frequencyCold: '#0066FF',
-  frequencyWarm: '#FF6B9D',
+  // Primary (Black accents for depth)
+  primary: '#000000',
+  secondary: '#333333',
+  neonCyan: '#000000',
+  neonCyanDim: 'rgba(0, 0, 0, 0.05)',
+  electricMagenta: '#000000',
+  electricMagentaDim: 'rgba(0, 0, 0, 0.05)',
 
   // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: '#888888',
-  textMuted: '#555555',
+  textPrimary: '#121212',
+  textSecondary: '#6C757D',
+  textMuted: '#ADB5BD',
 
   // Status
-  success: '#00FF88',
-  warning: '#FFAA00',
-  error: '#FF4466',
+  success: '#2E7D32',
+  warning: '#FFA000',
+  error: '#D32F2F',
 
-  // Game specific
-  cordDefault: '#444444',
-  cordActive: '#00FFFF',
-  gridTile: '#1A1A2E',
-  gridTileActive: '#2A2A4E',
-  ripple: 'rgba(0, 255, 255, 0.5)',
+  // Gradients (Monochrome)
+  gradientCyan: ['#000000', '#333333'],
+  gradientMagenta: ['#000000', '#333333'],
+  gradientCyanToMagenta: ['#000000', '#333333'],
+
+  // Frequency Sync (Grey to Black)
+  frequencyCold: '#999999',
+  frequencyWarm: '#000000',
+
+  // Game Specific
+  cordDefault: '#DDDDDD',
+  cordActive: '#000000',
+  gridTile: '#EEEEEE',
+  gridTileActive: '#CCCCCC',
+  ripple: 'rgba(0, 0, 0, 0.1)',
 };
 
 export const SPACING = {
@@ -49,11 +51,11 @@ export const SPACING = {
 };
 
 export const BORDER_RADIUS = {
-  sm: 8,
-  md: 12,
+  sm: 4,
+  md: 8,
   lg: 16,
   xl: 24,
-  full: 9999,
+  full: 999,
 };
 
 export const FONTS = {
@@ -72,26 +74,48 @@ export const FONTS = {
 };
 
 export const SHADOWS = {
-  neonCyan: {
-    shadowColor: '#00FFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
+  light: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  medium: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  large: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
     elevation: 10,
   },
+  // Depth effect for buttons
+  neonCyan: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+  },
   neonMagenta: {
-    shadowColor: '#FF00FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
   },
   subtle: {
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
 };
 
@@ -119,12 +143,12 @@ export const GAME = {
     hapticPattern: [0, 200, 100, 200] as number[],
   },
   syncGrid: {
-    matchWindow: 2000, // 2 seconds
+    matchWindow: 2000,
     gridSize: 3,
   },
   frequencySync: {
     syncThreshold: 0.05,
-    holdDuration: 3000, // 3 seconds
+    holdDuration: 3000,
   },
   stamina: {
     maxGamesPerDay: 3,

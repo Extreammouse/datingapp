@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,6 +14,7 @@ import {
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
     Camera,
     User,
@@ -24,13 +25,12 @@ import {
     X,
 } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { databaseService, UserProfile } from '../services/DatabaseService';
 
-interface ProfileSetupScreenProps {
-    navigation: NativeStackNavigationProp<RootStackParamList, 'ProfileSetup'>;
-}
+// Fix for imports
+type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 
 const DEFAULT_BIO_TAGS = [
     'Hiking', 'Coffee Lover', 'Dog Person', 'Cat Person', 'Foodie',
@@ -38,7 +38,8 @@ const DEFAULT_BIO_TAGS = [
     'Photography', 'Dancing', 'Cooking', 'Yoga', 'Beach', 'Mountains',
 ];
 
-export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigation }) => {
+export const ProfileSetupScreen: React.FC<Props> = ({ navigation, route }) => {
+    const isEditing = route.params?.isEditing || false;
     const [step, setStep] = useState(1);
     const [name, setName] = useState('');
     const [age, setAge] = useState('');
@@ -48,6 +49,57 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
     const [photos, setPhotos] = useState<string[]>([]);
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [existingProfile, setExistingProfile] = useState<UserProfile | null>(null);
+
+    useEffect(() => {
+        checkExistingProfile();
+    }, []);
+
+    const checkExistingProfile = async () => {
+        try {
+            await databaseService.initialize();
+            const profile = await databaseService.getUserProfile();
+            if (profile) {
+                setExistingProfile(profile);
+
+                // If editing, pre-fill and skip to step 1 (skipping welcome)
+                if (isEditing) {
+                    setName(profile.name);
+                    setAge(profile.age.toString());
+                    setBio(profile.bio);
+                    setGender(profile.gender);
+                    setLookingFor(profile.lookingFor);
+                    // DatabaseService already fixes paths in getUserProfile, but we can verify
+                    setPhotos(profile.photos);
+                    setSelectedTags(profile.bioTags.map(t => t.label));
+                    setStep(1); // Ensure we start at form
+                }
+            }
+        } catch (error) {
+            console.log('No existing profile found');
+        }
+    };
+
+    const handleContinueSession = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        navigation.replace('MainTabs');
+    };
+
+    const handleCreateNew = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Alert.alert(
+            'Create New Profile?',
+            'This will overwrite your existing profile data.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Create New',
+                    style: 'destructive',
+                    onPress: () => setExistingProfile(null)
+                }
+            ]
+        );
+    };
 
     const totalSteps = 4;
 
@@ -68,13 +120,43 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
 
         if (!result.canceled && result.assets[0]) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            const newPhotos = [...photos];
-            if (index < photos.length) {
-                newPhotos[index] = result.assets[0].uri;
-            } else {
-                newPhotos.push(result.assets[0].uri);
+
+            try {
+                // Ensure directory exists
+                const dirInfo = await FileSystem.getInfoAsync(FileSystem.documentDirectory + 'profile_images/');
+                if (!dirInfo.exists) {
+                    await FileSystem.makeDirectoryAsync(FileSystem.documentDirectory + 'profile_images/', { intermediates: true });
+                }
+
+                // Copy to permanent location
+                const uri = result.assets[0].uri;
+                const fileName = uri.split('/').pop() || `photo_${Date.now()}.jpg`;
+                const newPath = FileSystem.documentDirectory + 'profile_images/' + fileName;
+
+                await FileSystem.copyAsync({
+                    from: uri,
+                    to: newPath
+                });
+
+                const newPhotos = [...photos];
+                if (index < photos.length) {
+                    newPhotos[index] = newPath;
+                } else {
+                    newPhotos.push(newPath);
+                }
+                setPhotos(newPhotos);
+
+            } catch (error) {
+                console.error('Error saving photo:', error);
+                // Fallback to original URI if copy fails
+                const newPhotos = [...photos];
+                if (index < photos.length) {
+                    newPhotos[index] = result.assets[0].uri;
+                } else {
+                    newPhotos.push(result.assets[0].uri);
+                }
+                setPhotos(newPhotos);
             }
-            setPhotos(newPhotos);
         }
     };
 
@@ -97,6 +179,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
             case 1:
                 return name.trim().length >= 2 && age.trim().length > 0 && parseInt(age) >= 18;
             case 2:
+                // Require at least 1 photo
                 return photos.length >= 1;
             case 3:
                 return gender !== null && lookingFor !== null;
@@ -119,7 +202,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
                 await databaseService.initialize();
 
                 const profile: UserProfile = {
-                    id: `user_${Date.now()}`,
+                    id: existingProfile?.id || `user_${Date.now()}`,
                     name: name.trim(),
                     age: parseInt(age),
                     bio: bio.trim(),
@@ -131,13 +214,23 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
                     })),
                     gender: gender!,
                     lookingFor: lookingFor!,
-                    createdAt: Date.now(),
+                    createdAt: existingProfile?.createdAt || Date.now(),
                     updatedAt: Date.now(),
                 };
 
                 await databaseService.saveUserProfile(profile);
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                navigation.replace('MainTabs');
+
+                if (isEditing) {
+                    // Check if we can go back, otherwise replace
+                    if (navigation.canGoBack()) {
+                        navigation.goBack();
+                    } else {
+                        navigation.replace('MainTabs');
+                    }
+                } else {
+                    navigation.replace('MainTabs');
+                }
             } catch (error) {
                 console.error('Failed to save profile:', error);
                 Alert.alert('Error', 'Failed to save your profile. Please try again.');
@@ -148,6 +241,34 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
     };
 
     const renderStep = () => {
+        // Welcome Back View - Only show if NOT editing
+        if (existingProfile && !isEditing) {
+            return (
+                <Animated.View entering={FadeInDown.duration(300)} style={styles.stepContent}>
+                    <View style={styles.welcomeContainer}>
+                        <View style={styles.avatarContainer}>
+                            {existingProfile.photos[0] ? (
+                                <Image source={{ uri: existingProfile.photos[0] }} style={styles.welcomeAvatar} />
+                            ) : (
+                                <User size={80} color={COLORS.textPrimary} />
+                            )}
+                        </View>
+                        <Text style={styles.stepTitle}>Welcome back, {existingProfile.name}!</Text>
+                        <Text style={styles.stepSubtitle}>Ready to jump back in?</Text>
+
+                        <Pressable style={styles.continueButton} onPress={handleContinueSession}>
+                            <Text style={styles.continueButtonText}>Continue as {existingProfile.name}</Text>
+                            <ChevronRight size={24} color={COLORS.background} />
+                        </Pressable>
+
+                        <Pressable style={styles.secondaryButton} onPress={handleCreateNew}>
+                            <Text style={styles.secondaryButtonText}>Create New Profile</Text>
+                        </Pressable>
+                    </View>
+                </Animated.View>
+            );
+        }
+
         switch (step) {
             case 1:
                 return (
@@ -319,7 +440,12 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ navigati
                     disabled={!canProceed() || isLoading}
                 >
                     <Text style={styles.continueButtonText}>
-                        {isLoading ? 'Saving...' : step === totalSteps ? 'Get Started' : 'Continue'}
+                        {isLoading
+                            ? 'Saving...'
+                            : step === totalSteps
+                                ? (isEditing ? 'Save Changes' : 'Get Started')
+                                : 'Continue'
+                        }
                     </Text>
                     {!isLoading && <ChevronRight size={24} color={COLORS.background} />}
                 </Pressable>
@@ -524,6 +650,33 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: COLORS.background,
+    },
+    welcomeContainer: {
+        alignItems: 'center',
+        width: '100%',
+        gap: SPACING.xl,
+    },
+    avatarContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        overflow: 'hidden',
+        borderWidth: 4,
+        borderColor: COLORS.neonCyan,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: COLORS.surfaceLight,
+    },
+    welcomeAvatar: {
+        width: '100%',
+        height: '100%',
+    },
+    secondaryButton: {
+        paddingVertical: SPACING.md,
+    },
+    secondaryButtonText: {
+        color: COLORS.textMuted,
+        fontSize: 16,
     },
 });
 

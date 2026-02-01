@@ -16,6 +16,7 @@ export const ChatScreenWrapper: React.FC<Props> = ({ route, navigation }) => {
             matchImage={matchImage}
             currentUserId="current_user_id" // In production, get from auth context
             onBack={() => navigation.goBack()}
+            navigation={navigation}
         />
     );
 };

@@ -179,40 +179,7 @@ const Card: React.FC<CardProps> = ({
                     ))}
                 </View>
 
-                {/* Game buttons */}
-                {isTop && (
-                    <View style={styles.gameButtons}>
-                        <Pressable
-                            style={[styles.gameButton, { borderColor: COLORS.neonCyan }]}
-                            onPress={() => onStartGame('tugOfWar')}
-                        >
-                            <Play size={16} color={COLORS.neonCyan} />
-                            <Text style={[styles.gameButtonText, { color: COLORS.neonCyan }]}>
-                                Tug of War
-                            </Text>
-                        </Pressable>
-
-                        <Pressable
-                            style={[styles.gameButton, { borderColor: COLORS.electricMagenta }]}
-                            onPress={() => onStartGame('syncGrid')}
-                        >
-                            <Play size={16} color={COLORS.electricMagenta} />
-                            <Text style={[styles.gameButtonText, { color: COLORS.electricMagenta }]}>
-                                Sync Grid
-                            </Text>
-                        </Pressable>
-
-                        <Pressable
-                            style={[styles.gameButton, { borderColor: COLORS.frequencyWarm }]}
-                            onPress={() => onStartGame('frequencySync')}
-                        >
-                            <Play size={16} color={COLORS.frequencyWarm} />
-                            <Text style={[styles.gameButtonText, { color: COLORS.frequencyWarm }]}>
-                                Frequency
-                            </Text>
-                        </Pressable>
-                    </View>
-                )}
+                {/* Game buttons removed to rely on swipe gestures */}
             </View>
 
             {/* Neon border glow */}

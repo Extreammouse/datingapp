@@ -21,7 +21,7 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Circle, Polygon, Rect, G } from 'react-native-svg';
-import { Grid3X3 } from 'lucide-react-native';
+import { Grid3X3, MessageCircle } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS, ANIMATION, GAME } from '../../constants/theme';
 import socketService from '../../services/SocketService';
 
@@ -35,6 +35,7 @@ interface SyncGridProps {
     partnerId: string;
     partnerImage?: string;
     onGameComplete: (matchCount: number) => void;
+    onOpenChat?: () => void;
 }
 
 // Abstract SVG patterns for each tile
@@ -123,6 +124,7 @@ export const SyncGrid: React.FC<SyncGridProps> = ({
     partnerId,
     partnerImage,
     onGameComplete,
+    onOpenChat,
 }) => {
     const [matchedIndices, setMatchedIndices] = useState<number[]>([]);
     const [rippleIndex, setRippleIndex] = useState<number | null>(null);
@@ -302,6 +304,21 @@ export const SyncGrid: React.FC<SyncGridProps> = ({
                     />
                 ))}
             </View>
+            {/* Game completed overlay */}
+            {matchedIndices.length + 1 >= GRID_SIZE * GRID_SIZE && (
+                <View style={styles.completedOverlay}>
+                    <Text style={styles.completedText}>✨ Resonance Achieved ✨</Text>
+                    {onOpenChat && (
+                        <Pressable
+                            style={styles.connectButton}
+                            onPress={onOpenChat}
+                        >
+                            <MessageCircle size={20} color={COLORS.background} />
+                            <Text style={styles.connectButtonText}>Message</Text>
+                        </Pressable>
+                    )}
+                </View>
+            )}
         </View>
     );
 };
@@ -404,6 +421,33 @@ const styles = StyleSheet.create({
     },
     matchDotActive: {
         backgroundColor: COLORS.success,
+    },
+    completedOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: SPACING.md,
+    },
+    completedText: {
+        color: COLORS.textPrimary,
+        fontSize: 28,
+        fontWeight: 'bold',
+    },
+    connectButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        paddingHorizontal: SPACING.xl,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.electricMagenta,
+        borderRadius: BORDER_RADIUS.full,
+        marginTop: SPACING.lg,
+    },
+    connectButtonText: {
+        color: COLORS.background,
+        fontSize: 18,
+        fontWeight: 'bold',
     },
 });
 

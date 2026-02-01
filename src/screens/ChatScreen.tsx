@@ -22,14 +22,17 @@ import { Send, ArrowLeft, Heart, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
 import socketService from '../services/SocketService';
+import { GamePickerModal } from '../components/GamePickerModal';
+import { GameInvitationCard } from '../components/GameInvitationCard';
 
 export interface Message {
     id: string;
     text: string;
     senderId: string;
     timestamp: number;
-    type: 'text' | 'reaction' | 'system';
+    type: 'text' | 'reaction' | 'system' | 'game_invitation';
     reaction?: string;
+    gameName?: string;
 }
 
 interface ChatScreenProps {
@@ -38,6 +41,7 @@ interface ChatScreenProps {
     matchImage?: string;
     currentUserId: string;
     onBack: () => void;
+    navigation?: any;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -48,7 +52,8 @@ const MessageBubble: React.FC<{
     isOwn: boolean;
     showAvatar: boolean;
     matchImage?: string;
-}> = ({ message, isOwn, showAvatar, matchImage }) => {
+    onGamePress?: (gameName: string) => void;
+}> = ({ message, isOwn, showAvatar, matchImage, onGamePress }) => {
     if (message.type === 'system') {
         return (
             <View style={styles.systemMessage}>
@@ -63,6 +68,33 @@ const MessageBubble: React.FC<{
             <View style={[styles.reactionBubble, isOwn && styles.reactionBubbleOwn]}>
                 <Text style={styles.reactionEmoji}>{message.reaction}</Text>
             </View>
+        );
+    }
+
+    if (message.type === 'game_invitation' && message.gameName) {
+        return (
+            <Animated.View
+                entering={FadeInDown.duration(300).springify()}
+                style={[styles.messageRow, isOwn && styles.messageRowOwn]}
+            >
+                {!isOwn && showAvatar && (
+                    <View style={styles.avatarContainer}>
+                        {matchImage ? (
+                            <Image source={{ uri: matchImage }} style={styles.avatar} />
+                        ) : (
+                            <View style={styles.avatarPlaceholder}>
+                                <Heart size={12} color={COLORS.electricMagenta} />
+                            </View>
+                        )}
+                    </View>
+                )}
+                {!isOwn && !showAvatar && <View style={styles.avatarSpacer} />}
+
+                <GameInvitationCard
+                    gameName={message.gameName}
+                    onPress={() => onGamePress?.(message.gameName!)}
+                />
+            </Animated.View>
         );
     }
 
@@ -111,6 +143,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     matchImage,
     currentUserId,
     onBack,
+    navigation,
 }) => {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -123,6 +156,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     ]);
     const [inputText, setInputText] = useState('');
     const [showReactions, setShowReactions] = useState(false);
+    const [showGamePicker, setShowGamePicker] = useState(false);
     const flatListRef = useRef<FlatList>(null);
 
     const sendButtonScale = useSharedValue(1);
@@ -207,6 +241,16 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                 isOwn={isOwn}
                 showAvatar={showAvatar}
                 matchImage={matchImage}
+                onGamePress={(gameName) => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    setMessages((prev) => [...prev, {
+                        id: `status_${Date.now()}`,
+                        text: `⏳ Waiting for ${matchName} to join ${gameName}...`,
+                        senderId: 'system',
+                        timestamp: Date.now(),
+                        type: 'system',
+                    }]);
+                }}
             />
         );
     };
@@ -277,6 +321,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                         <Text style={styles.reactionToggleText}>😊</Text>
                     </Pressable>
 
+                    <Pressable
+                        style={styles.gameToggle}
+                        onPress={() => setShowGamePicker(true)}
+                    >
+                        <Sparkles size={24} color={COLORS.neonCyan} />
+                    </Pressable>
+
                     <TextInput
                         style={styles.input}
                         value={inputText}
@@ -305,6 +356,23 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                         />
                     </AnimatedPressable>
                 </Animated.View>
+
+                {/* Game Picker Modal */}
+                <GamePickerModal
+                    visible={showGamePicker}
+                    onClose={() => setShowGamePicker(false)}
+                    matchName={matchName}
+                    onSelectGame={(gameName) => {
+                        setMessages((prev) => [...prev, {
+                            id: `game_${Date.now()}`,
+                            text: `Let's play ${gameName}!`,
+                            senderId: currentUserId,
+                            timestamp: Date.now(),
+                            type: 'game_invitation',
+                            gameName: gameName,
+                        }]);
+                    }}
+                />
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -313,11 +381,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: '#FFFFFF',
     },
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: '#FFFFFF',
     },
     header: {
         flexDirection: 'row',
@@ -396,25 +464,25 @@ const styles = StyleSheet.create({
     },
     messageBubble: {
         maxWidth: '75%',
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
-        borderRadius: BORDER_RADIUS.lg,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 18,
     },
     ownBubble: {
-        backgroundColor: COLORS.neonCyan,
-        borderBottomRightRadius: SPACING.xs,
+        backgroundColor: '#007AFF',
+        borderBottomRightRadius: 4,
     },
     theirBubble: {
-        backgroundColor: COLORS.surface,
-        borderBottomLeftRadius: SPACING.xs,
+        backgroundColor: '#E9E9EB',
+        borderBottomLeftRadius: 4,
     },
     messageText: {
-        fontSize: 15,
-        color: COLORS.textPrimary,
-        lineHeight: 20,
+        fontSize: 17,
+        color: '#000000',
+        lineHeight: 22,
     },
     ownMessageText: {
-        color: COLORS.background,
+        color: '#FFFFFF',
     },
     messageTime: {
         fontSize: 10,
@@ -470,9 +538,9 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
         paddingHorizontal: SPACING.md,
         paddingVertical: SPACING.sm,
-        backgroundColor: COLORS.surface,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.surfaceLight,
+        backgroundColor: '#F6F6F6',
+        borderTopWidth: 0.5,
+        borderTopColor: '#C7C7CC',
         gap: SPACING.sm,
     },
     reactionToggle: {
@@ -481,22 +549,27 @@ const styles = StyleSheet.create({
     reactionToggleText: {
         fontSize: 24,
     },
+    gameToggle: {
+        padding: SPACING.sm,
+    },
     input: {
         flex: 1,
-        minHeight: 40,
+        minHeight: 36,
         maxHeight: 100,
-        backgroundColor: COLORS.surfaceLight,
-        borderRadius: BORDER_RADIUS.lg,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
-        color: COLORS.textPrimary,
-        fontSize: 15,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#C7C7CC',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        color: '#000000',
+        fontSize: 17,
     },
     sendButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.surfaceLight,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#007AFF',
         justifyContent: 'center',
         alignItems: 'center',
     },

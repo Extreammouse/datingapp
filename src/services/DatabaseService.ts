@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system/legacy';
 import { BioTag } from '../types';
 
 export interface UserProfile {
@@ -13,6 +14,28 @@ export interface UserProfile {
     createdAt: number;
     updatedAt: number;
 }
+
+// Helper to fix paths on iOS where container UUID changes
+const fixPhotoPath = (uri: string): string => {
+    if (!uri) return uri;
+    // If it's a remote URL, return as is
+    if (uri.startsWith('http')) return uri;
+
+    const docDir = FileSystem.documentDirectory;
+    console.log(`[DatabaseService] fixPhotoPath: uri=${uri}, docDir=${docDir}`);
+
+    // If it is in our specific storage folder, reconstruct the path
+    if (uri.includes('profile_images/')) {
+        const parts = uri.split('profile_images/');
+        const filename = parts[parts.length - 1];
+        if (filename && docDir) {
+            const newPath = docDir + 'profile_images/' + filename;
+            console.log(`[DatabaseService] Reconstructed path: ${newPath}`);
+            return newPath;
+        }
+    }
+    return uri;
+};
 
 export interface NearbyUser {
     id: string;
@@ -229,6 +252,29 @@ class DatabaseService {
             [profile.id]
         );
 
+        const validPhotos: string[] = [];
+        for (const p of photos) {
+            const fixedUri = fixPhotoPath(p.photo_uri);
+
+            if (fixedUri.startsWith('http')) {
+                validPhotos.push(fixedUri);
+                continue;
+            }
+
+            try {
+                const info = await FileSystem.getInfoAsync(fixedUri);
+                if (info.exists) {
+                    validPhotos.push(fixedUri);
+                } else {
+                    console.log('[DatabaseService] Photo does not exist on disk:', fixedUri);
+                }
+            } catch (e) {
+                console.log('[DatabaseService] Error checking photo:', fixedUri, e);
+            }
+        }
+
+        console.log(`[DatabaseService] Returning ${validPhotos.length} valid photos out of ${photos.length} total.`);
+
         // Get bio tags
         const bioTags = await this.db.getAllAsync<{ tag_id: string; label: string; icon: string | null }>(
             'SELECT tag_id, label, icon FROM bio_tags WHERE user_id = ?',
@@ -240,7 +286,7 @@ class DatabaseService {
             name: profile.name,
             age: profile.age,
             bio: profile.bio,
-            photos: photos.map(p => p.photo_uri),
+            photos: validPhotos,
             bioTags: bioTags.map(t => ({ id: t.tag_id, label: t.label, icon: t.icon || undefined, revealed: false })),
             gender: profile.gender as 'male' | 'female' | 'other',
             lookingFor: profile.looking_for as 'male' | 'female' | 'everyone',

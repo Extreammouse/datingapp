@@ -5,6 +5,7 @@ import {
     StyleSheet,
     Dimensions,
     Image,
+    Pressable,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -25,7 +26,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { Radio, Zap } from 'lucide-react-native';
+import { Radio, Zap, MessageCircle } from 'lucide-react-native';
 import { COLORS, SPACING, BORDER_RADIUS, ANIMATION, GAME } from '../../constants/theme';
 import socketService from '../../services/SocketService';
 
@@ -95,6 +96,7 @@ interface FrequencySyncProps {
     partnerId: string;
     partnerImage?: string;
     onGameComplete: () => void;
+    onOpenChat?: () => void;
 }
 
 export const FrequencySync: React.FC<FrequencySyncProps> = ({
@@ -102,6 +104,7 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
     partnerId,
     partnerImage,
     onGameComplete,
+    onOpenChat,
 }) => {
     // Slider values (0.0 to 1.0)
     const myValue = useSharedValue(0.5);
@@ -430,6 +433,15 @@ export const FrequencySync: React.FC<FrequencySyncProps> = ({
             {gameCompleted && (
                 <View style={styles.completedOverlay}>
                     <Text style={styles.completedText}>✨ Resonance Achieved ✨</Text>
+                    {onOpenChat && (
+                        <Pressable
+                            style={styles.connectButton}
+                            onPress={onOpenChat}
+                        >
+                            <MessageCircle size={20} color={COLORS.background} />
+                            <Text style={styles.connectButtonText}>Message</Text>
+                        </Pressable>
+                    )}
                 </View>
             )}
         </GestureHandlerRootView>
@@ -610,6 +622,21 @@ const styles = StyleSheet.create({
     completedText: {
         color: COLORS.textPrimary,
         fontSize: 28,
+        fontWeight: 'bold',
+    },
+    connectButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+        paddingHorizontal: SPACING.xl,
+        paddingVertical: SPACING.md,
+        backgroundColor: COLORS.electricMagenta,
+        borderRadius: BORDER_RADIUS.full,
+        marginTop: SPACING.lg,
+    },
+    connectButtonText: {
+        color: COLORS.background,
+        fontSize: 18,
         fontWeight: 'bold',
     },
 });

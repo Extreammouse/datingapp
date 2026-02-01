@@ -1,109 +1,83 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Search, Heart, User, Plus } from 'lucide-react-native';
-import { COLORS, SPACING } from '../constants/theme';
-import { HomeScreen } from '../screens/HomeScreen';
+import { MapPin, MessageCircle, User as UserIcon } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import { COLORS, SPACING, SHADOWS } from '../constants/theme';
 import { MapScreen } from '../screens/MapScreen';
 import { MatchesListScreen } from '../screens/MatchesListScreen';
 import { MyProfileScreen } from '../screens/MyProfileScreen';
 
 export type BottomTabParamList = {
-    HomeTab: undefined;
-    SearchTab: undefined;
-    AddTab: undefined;
-    MatchesTab: undefined;
-    ProfileTab: undefined;
+    ExploreMap: undefined;
+    ChatList: undefined;
+    MyProfile: undefined;
 };
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
-// Custom center button component
-const CenterButton: React.FC<{ onPress: () => void }> = ({ onPress }) => (
-    <Pressable style={styles.centerButton} onPress={onPress}>
-        <View style={styles.centerButtonInner}>
-            <Plus size={28} color={COLORS.background} strokeWidth={3} />
-        </View>
-    </Pressable>
-);
-
-// Empty component for the center tab (we use custom button)
-const EmptyScreen = () => null;
-
-export const BottomTabNavigator: React.FC<{ onCenterPress: () => void }> = ({ onCenterPress }) => {
+export const BottomTabNavigator: React.FC = () => {
     return (
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
-                tabBarShowLabel: false,
+                tabBarShowLabel: true,
+                tabBarLabelStyle: styles.tabLabel,
                 tabBarStyle: styles.tabBar,
-                tabBarActiveTintColor: COLORS.electricMagenta,
-                tabBarInactiveTintColor: COLORS.textMuted,
+                tabBarBackground: () => (
+                    <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+                ),
+                tabBarActiveTintColor: COLORS.primary,
+                tabBarInactiveTintColor: COLORS.textSecondary,
             }}
+            initialRouteName="ExploreMap"
         >
             <Tab.Screen
-                name="HomeTab"
-                component={HomeScreen}
-                options={{
-                    tabBarIcon: ({ color, focused }) => (
-                        <Home
-                            size={24}
-                            color={focused ? COLORS.electricMagenta : color}
-                            strokeWidth={focused ? 2.5 : 2}
-                        />
-                    ),
-                }}
-            />
-            <Tab.Screen
-                name="SearchTab"
+                name="ExploreMap"
                 component={MapScreen}
                 options={{
+                    tabBarLabel: 'EXPLORE',
                     tabBarIcon: ({ color, focused }) => (
-                        <Search
-                            size={24}
-                            color={focused ? COLORS.electricMagenta : color}
-                            strokeWidth={focused ? 2.5 : 2}
-                        />
+                        <View style={[styles.iconContainer, focused && styles.iconActive]}>
+                            <MapPin
+                                size={24}
+                                color={focused ? COLORS.primary : color}
+                                strokeWidth={focused ? 2.5 : 2}
+                            />
+                        </View>
                     ),
                 }}
             />
             <Tab.Screen
-                name="AddTab"
-                component={EmptyScreen}
-                options={{
-                    tabBarButton: () => <CenterButton onPress={onCenterPress} />,
-                }}
-                listeners={{
-                    tabPress: (e) => {
-                        e.preventDefault();
-                        onCenterPress();
-                    },
-                }}
-            />
-            <Tab.Screen
-                name="MatchesTab"
+                name="ChatList"
                 component={MatchesListScreen}
                 options={{
+                    tabBarLabel: 'CONNECT',
                     tabBarIcon: ({ color, focused }) => (
-                        <Heart
-                            size={24}
-                            color={focused ? COLORS.electricMagenta : color}
-                            fill={focused ? COLORS.electricMagenta : 'transparent'}
-                            strokeWidth={focused ? 2.5 : 2}
-                        />
+                        <View style={[styles.iconContainer, focused && styles.iconActive]}>
+                            <MessageCircle
+                                size={24}
+                                color={focused ? COLORS.primary : color}
+                                strokeWidth={focused ? 2.5 : 2}
+                            />
+                        </View>
                     ),
+                    tabBarBadgeStyle: { backgroundColor: COLORS.error },
                 }}
             />
             <Tab.Screen
-                name="ProfileTab"
+                name="MyProfile"
                 component={MyProfileScreen}
                 options={{
+                    tabBarLabel: 'PROFILE',
                     tabBarIcon: ({ color, focused }) => (
-                        <User
-                            size={24}
-                            color={focused ? COLORS.electricMagenta : color}
-                            strokeWidth={focused ? 2.5 : 2}
-                        />
+                        <View style={[styles.iconContainer, focused && styles.iconActive]}>
+                            <UserIcon
+                                size={24}
+                                color={focused ? COLORS.primary : color}
+                                strokeWidth={focused ? 2.5 : 2}
+                            />
+                        </View>
                     ),
                 }}
             />
@@ -117,35 +91,22 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        height: Platform.OS === 'ios' ? 85 : 65,
-        paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-        paddingTop: 10,
-        backgroundColor: COLORS.surface,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.surfaceLight,
-        elevation: 15,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
+        height: Platform.OS === 'ios' ? 90 : 70,
+        borderTopWidth: 0,
+        elevation: 0,
+        backgroundColor: 'transparent',
     },
-    centerButton: {
-        top: -25,
-        justifyContent: 'center',
-        alignItems: 'center',
+    tabLabel: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+        marginBottom: Platform.OS === 'ios' ? 0 : 5,
     },
-    centerButtonInner: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: COLORS.electricMagenta,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: COLORS.electricMagenta,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 8,
+    iconContainer: {
+        padding: 5,
+    },
+    iconActive: {
+        transform: [{ scale: 1.1 }],
     },
 });
 

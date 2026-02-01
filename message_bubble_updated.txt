@@ -1,0 +1,81 @@
+// Message bubble component - Updated with game invitation support
+const MessageBubble: React.FC<{
+    message: Message;
+    isOwn: boolean;
+    showAvatar: boolean;
+    matchImage?: string;
+    onGamePress?: (gameName: string) => void;
+}> = ({ message, isOwn, showAvatar, matchImage, onGamePress }) => {
+    if (message.type === 'system') {
+        return (
+            <View style={styles.systemMessage}>
+                <Sparkles size={14} color={COLORS.neonCyan} />
+                <Text style={styles.systemMessageText}>{message.text}</Text>
+            </View>
+        );
+    }
+
+    if (message.type === 'reaction') {
+        return (
+            <View style={[styles.reactionBubble, isOwn && styles.reactionBubbleOwn]}>
+                <Text style={styles.reactionEmoji}>{message.reaction}</Text>
+            </View>
+        );
+    }
+
+    if (message.type === 'game_invitation' && message.gameName) {
+        return (
+            <Animated.View
+                entering={FadeInDown.duration(300).springify()}
+                style={[styles.messageRow, isOwn && styles.messageRowOwn]}
+            >
+                {!isOwn && showAvatar && (
+                    <View style={styles.avatarContainer}>
+                        {matchImage ? (
+                            <Image source={{ uri: matchImage }} style={styles.avatar} />
+                        ) : (
+                            <View style={styles.avatarPlaceholder}>
+                                <Heart size={12} color={COLORS.electricMagenta} />
+                            </View>
+                        )}
+                    </View>
+                )}
+                {!isOwn && !showAvatar && <View style={styles.avatarSpacer} />}
+                
+                <GameInvitationCard
+                    gameName={message.gameName}
+                    onPress={() => onGamePress?.(message.gameName!)}
+                />
+            </Animated.View>
+        );
+    }
+
+    return (
+        <Animated.View
+            entering={FadeInDown.duration(200).springify()}
+            style={[styles.messageRow, isOwn && styles.messageRowOwn]}
+        >
+            {!isOwn && showAvatar && (
+                <View style={styles.avatarContainer}>
+                    {matchImage ? (
+                        <Image source={{ uri: matchImage }} style={styles.avatar} />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Heart size={12} color={COLORS.electricMagenta} />
+                        </View>
+                    )}
+                </View>
+            )}
+            {!isOwn && !showAvatar && <View style={styles.avatarSpacer} />}
+
+            <View style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.theirBubble]}>
+                <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
+                    {message.text}
+                </Text>
+                <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+                    {formatTime(message.timestamp)}
+                </Text>
+            </View>
+        </Animated.View>
+    );
+};

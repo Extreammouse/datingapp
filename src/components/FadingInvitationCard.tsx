@@ -27,11 +27,12 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 interface FadingInvitationCardProps {
     invitation: Invitation;
+    onAccept?: () => void;
 }
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-export const FadingInvitationCard: React.FC<FadingInvitationCardProps> = ({ invitation }) => {
+export const FadingInvitationCard: React.FC<FadingInvitationCardProps> = ({ invitation, onAccept }) => {
     const { raincheckInvitation } = useHuddleStore();
 
     // Time tracking
@@ -188,7 +189,13 @@ export const FadingInvitationCard: React.FC<FadingInvitationCardProps> = ({ invi
                             <Text style={styles.buttonText}>Raincheck</Text>
                         </Pressable>
 
-                        <Pressable style={[styles.button, styles.acceptButton]}>
+                        <Pressable
+                            style={[styles.button, styles.acceptButton]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                if (onAccept) onAccept();
+                            }}
+                        >
                             <Text style={styles.buttonText}>Accept</Text>
                         </Pressable>
                     </View>

@@ -74,7 +74,7 @@ export interface GameRecord {
 
 // Navigation types
 export type RootStackParamList = {
-    ProfileSetup: undefined;
+    ProfileSetup: { isEditing?: boolean } | undefined;
     MainTabs: undefined;
     Home: undefined;
     MyProfile: undefined;
@@ -85,7 +85,8 @@ export type RootStackParamList = {
     SyncGrid: { roomId: string; partnerId: string };
     FrequencySync: { roomId: string; partnerId: string };
     Profile: { userId: string; revealed: boolean };
-    GameSelection: { partnerId: string };
+    GameSelection: { partnerId: string; fragmentId?: string };
+    GameGauntlet: { partnerId: string };
 };
 
 // Socket event types
@@ -113,4 +114,25 @@ export interface SocketEvents {
     syncState: (data: { userAValue: number; userBValue: number; isInSync: boolean }) => void;
     resonanceEvent: (data: { intensity: number }) => void;
     profileReveal: () => void;
+}
+
+// Resonance Types
+export type FragmentType = 'interest' | 'tag' | 'silhouette' | 'name';
+
+export interface Fragment {
+    id: string;
+    type: FragmentType;
+    coordinate: { latitude: number; longitude: number };
+    isCollected: boolean;
+    value: string; // The content (e.g., "Hiking", "Alex", "PhotoURL")
+    icon: string; // Icon name for the map marker
+}
+
+export interface ResonanceProfile {
+    id: string;
+    name: string;
+    photo: string;
+    fragments: Fragment[];
+    isUnlocked: boolean;
+    distance: number;
 }

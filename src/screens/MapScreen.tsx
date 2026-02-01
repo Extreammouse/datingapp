@@ -1,314 +1,377 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     Dimensions,
     ActivityIndicator,
+    Alert,
+    Image,
 } from 'react-native';
-import { MapPin, Users, Radar } from 'lucide-react-native';
-import * as Location from 'expo-location';
-import { COLORS, SPACING, BORDER_RADIUS } from '../constants/theme';
-import { databaseService, NearbyUser } from '../services/DatabaseService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { Marker, PROVIDER_DEFAULT, Polyline } from 'react-native-maps';
+import { useResonanceStore } from '../store/useResonanceStore';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, FONTS } from '../constants/theme';
+import { Fragment, ResonanceProfile } from '../types';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withSequence,
+    withTiming,
+} from 'react-native-reanimated';
+import { Navigation, Gamepad2, User, Camera, Music, Hash, Zap } from 'lucide-react-native';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const INITIAL_REGION = {
+    latitude: 42.3601,
+    longitude: -71.0589,
+    latitudeDelta: 0.005,
+    longitudeDelta: 0.005,
+};
 
-// Simple map representation (no actual map library needed for MVP)
-export const MapScreen: React.FC = () => {
-    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-    const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+// Mock user path (Trail)
+const MOCK_PATH = [
+    { latitude: 42.3601, longitude: -71.0589 },
+    { latitude: 42.3605, longitude: -71.0585 },
+    { latitude: 42.3610, longitude: -71.0582 },
+    { latitude: 42.3615, longitude: -71.0580 },
+    { latitude: 42.3620, longitude: -71.0575 },
+];
+
+// Fragment Marker Component (Photo Shard)
+const FragmentMarker = ({ fragment, profilePhoto, onPress }: { fragment: Fragment; profilePhoto: string; onPress: () => void }) => {
+    const scale = useSharedValue(1);
 
     useEffect(() => {
-        initializeMap();
+        scale.value = withRepeat(
+            withSequence(
+                withTiming(1.1, { duration: 1500 }),
+                withTiming(1, { duration: 1500 })
+            ),
+            -1,
+            true
+        );
     }, []);
 
-    const initializeMap = async () => {
-        try {
-            // Request location permission
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                setErrorMsg('Location permission denied');
-                setLoading(false);
-                return;
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
+    return (
+        <Marker
+            coordinate={fragment.coordinate}
+            onPress={onPress}
+            opacity={fragment.isCollected ? 0.4 : 1}
+        >
+            <Animated.View style={[styles.shardContainer, animatedStyle]}>
+                <View style={[styles.shardOuter, fragment.isCollected && styles.shardCollected]}>
+                    <Image
+                        source={{ uri: profilePhoto }}
+                        style={styles.shardImage}
+                        blurRadius={fragment.isCollected ? 0 : 5} // Blurred until collected? Or logic reversed based on user request "blurred until collected"
+                    />
+                    {/* Overlay Icon */}
+                    <View style={styles.shardIconOverlay}>
+                        {getFragmentIcon(fragment.type)}
+                    </View>
+                </View>
+            </Animated.View>
+        </Marker>
+    );
+};
+
+const getFragmentIcon = (type: string) => {
+    switch (type) {
+        case 'interest': return <Music size={12} color={COLORS.background} />;
+        case 'tag': return <Hash size={12} color={COLORS.background} />;
+        case 'name': return <User size={12} color={COLORS.background} />;
+        default: return <Zap size={12} color={COLORS.background} />;
+    }
+};
+
+export const MapScreen: React.FC = ({ navigation }: any) => {
+    const { nearbyProfiles, setActiveGameFragment, collectFragment } = useResonanceStore();
+    const [loading, setLoading] = useState(true);
+    const [userLoc, setUserLoc] = useState(INITIAL_REGION);
+
+    // Simulate walking
+    useEffect(() => {
+        setTimeout(() => setLoading(false), 1500);
+
+        let pathIndex = 0;
+        const interval = setInterval(() => {
+            if (pathIndex < MOCK_PATH.length) {
+                const nextPoint = MOCK_PATH[pathIndex];
+                setUserLoc(prev => ({ ...prev, latitude: nextPoint.latitude, longitude: nextPoint.longitude }));
+                pathIndex = (pathIndex + 1) % MOCK_PATH.length; // Loop walking
             }
+        }, 3000);
 
-            // Get current location
-            const location = await Location.getCurrentPositionAsync({});
-            setUserLocation({
-                lat: location.coords.latitude,
-                lng: location.coords.longitude,
-            });
+        return () => clearInterval(interval);
+    }, []);
 
-            // Load nearby users from database
-            await databaseService.initialize();
-            const users = await databaseService.getNearbyUsers();
-            setNearbyUsers(users);
-        } catch (error) {
-            console.error('Failed to initialize map:', error);
-            setErrorMsg('Failed to get location');
-        } finally {
-            setLoading(false);
+    const handleFragmentPress = (profile: ResonanceProfile, fragment: Fragment) => {
+        // Simple geofence check (mock)
+        const distance = Math.sqrt(
+            Math.pow(fragment.coordinate.latitude - userLoc.latitude, 2) +
+            Math.pow(fragment.coordinate.longitude - userLoc.longitude, 2)
+        );
+
+        // Allowed distance (approx 0.001 degrees ~ 100m)
+        const MAX_DIST = 0.002;
+
+        if (distance > MAX_DIST && !fragment.isCollected && !profile.isUnlocked) {
+            Alert.alert('Out of Range', 'Move closer to the fragment to analyze signal.');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            return;
         }
+
+        if (fragment.isCollected || profile.isUnlocked) {
+            navigation.navigate('MyProfile', { userId: profile.id, revealed: profile.isUnlocked }); // Temp nav to profile
+            return;
+        }
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        setActiveGameFragment(fragment);
+
+        Alert.alert(
+            'Signal Intercepted',
+            'Decrypt this shard to collect data.',
+            [
+                { text: 'Ignore', style: 'cancel' },
+                {
+                    text: 'INITIALIZE',
+                    onPress: () => {
+                        // Collect fragment immediately for progress sync
+                        collectFragment(profile.id, fragment.id);
+
+                        // Navigate to game for additional rewards/validation
+                        navigation.navigate('GameSelection', {
+                            partnerId: profile.id,
+                            fragmentId: fragment.id
+                        });
+                    }
+                }
+            ]
+        );
     };
 
     if (loading) {
         return (
             <SafeAreaView style={styles.container}>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={COLORS.neonCyan} />
-                    <Text style={styles.loadingText}>Finding your location...</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    if (errorMsg) {
-        return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.errorContainer}>
-                    <MapPin size={60} color={COLORS.textMuted} />
-                    <Text style={styles.errorText}>{errorMsg}</Text>
-                    <Text style={styles.errorSubtext}>
-                        Enable location access in Settings to find matches nearby
-                    </Text>
-                </View>
+                <ActivityIndicator size="large" color={COLORS.neonCyan} />
+                <Text style={styles.loadingText}>Triangulating Resonance Signals...</Text>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <Radar size={24} color={COLORS.neonCyan} />
-                <Text style={styles.headerTitle}>Nearby</Text>
+        <View style={styles.container}>
+            <MapView
+                style={styles.map}
+                provider={PROVIDER_DEFAULT}
+                initialRegion={INITIAL_REGION}
+                region={userLoc}
+                customMapStyle={DARK_MAP_STYLE}
+                showsUserLocation={false}
+            >
+                {/* User Marker (Self) */}
+                <Marker coordinate={userLoc}>
+                    <View style={styles.userMarkerOut}>
+                        <View style={styles.userMarkerIn} />
+                    </View>
+                </Marker>
+
+                {/* Trail Logic - Show where "User" has been (Mock) */}
+                <Polyline
+                    coordinates={MOCK_PATH}
+                    strokeColor={COLORS.neonCyan}
+                    strokeWidth={2}
+                    lineDashPattern={[5, 5]}
+                />
+
+                {nearbyProfiles.map((profile) => (
+                    profile.fragments.map((fragment) => (
+                        <FragmentMarker
+                            key={fragment.id}
+                            fragment={fragment}
+                            profilePhoto={profile.photo}
+                            onPress={() => handleFragmentPress(profile, fragment)}
+                        />
+                    ))
+                ))}
+            </MapView>
+
+            <View style={styles.headerOverlay}>
+                <View style={styles.headerBlur}>
+                    <Text style={styles.headerTitle}>EXPLORE</Text>
+                    <View style={styles.signalBadge}>
+                        <Zap size={12} color={COLORS.background} fill={COLORS.background} />
+                        <Text style={styles.signalText}>{nearbyProfiles.length} SIGNALS DETECTED</Text>
+                    </View>
+                </View>
             </View>
 
-            {/* Simple Map View */}
-            <View style={styles.mapContainer}>
-                {/* Map background */}
-                <View style={styles.mapBackground}>
-                    {/* Grid lines for visual effect */}
-                    {Array.from({ length: 10 }).map((_, i) => (
-                        <View key={`h-${i}`} style={[styles.gridLine, styles.gridLineHorizontal, { top: `${i * 10}%` }]} />
-                    ))}
-                    {Array.from({ length: 10 }).map((_, i) => (
-                        <View key={`v-${i}`} style={[styles.gridLine, styles.gridLineVertical, { left: `${i * 10}%` }]} />
-                    ))}
-
-                    {/* User's location (center) */}
-                    <View style={styles.userMarker}>
-                        <View style={styles.userMarkerPulse} />
-                        <View style={styles.userMarkerDot} />
-                        <Text style={styles.youLabel}>You</Text>
-                    </View>
-
-                    {/* Nearby users */}
-                    {nearbyUsers.map((user, index) => {
-                        // Position users in a circle around center
-                        const angle = (index / nearbyUsers.length) * Math.PI * 2;
-                        const distance = 80 + (user.distance / 10);
-                        const x = Math.cos(angle) * distance;
-                        const y = Math.sin(angle) * distance;
-
-                        return (
-                            <View
-                                key={user.id}
-                                style={[
-                                    styles.nearbyUserMarker,
-                                    {
-                                        transform: [{ translateX: x }, { translateY: y }],
-                                    },
-                                ]}
-                            >
-                                <View style={styles.nearbyUserDot} />
-                                <Text style={styles.nearbyUserName}>{user.name}</Text>
-                                <Text style={styles.nearbyUserDistance}>{Math.round(user.distance)}m</Text>
-                            </View>
-                        );
-                    })}
-                </View>
-
-                {/* No matches message */}
-                {nearbyUsers.length === 0 && (
-                    <View style={styles.noMatchesOverlay}>
-                        <Users size={40} color={COLORS.textMuted} />
-                        <Text style={styles.noMatchesText}>No one nearby yet</Text>
-                        <Text style={styles.noMatchesSubtext}>
-                            Keep exploring! Matches appear when your paths cross.
-                        </Text>
-                    </View>
-                )}
+            <View style={styles.footerOverlay}>
+                <Text style={styles.footerText}>Walk near fragments to collect shards.</Text>
             </View>
-
-            {/* Location info */}
-            {userLocation && (
-                <View style={styles.locationInfo}>
-                    <MapPin size={16} color={COLORS.neonCyan} />
-                    <Text style={styles.locationText}>
-                        {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-                    </Text>
-                </View>
-            )}
-        </SafeAreaView>
+        </View>
     );
 };
+
+const DARK_MAP_STYLE = [
+    {
+        "elementType": "geometry",
+        "stylers": [{ "color": "#121212" }]
+    },
+    {
+        "elementType": "labels.icon",
+        "stylers": [{ "visibility": "off" }]
+    },
+    {
+        "elementType": "labels.text.fill",
+        "stylers": [{ "color": "#757575" }]
+    },
+    {
+        "elementType": "labels.text.stroke",
+        "stylers": [{ "color": "#212121" }]
+    },
+    {
+        "featureType": "administrative",
+        "elementType": "geometry",
+        "stylers": [{ "color": "#757575" }]
+    },
+    {
+        "featureType": "poi",
+        "elementType": "labels.text.fill",
+        "stylers": [{ "color": "#757575" }]
+    },
+    {
+        "featureType": "road",
+        "elementType": "geometry.fill",
+        "stylers": [{ "color": "#2c2c2c" }]
+    },
+    {
+        "featureType": "water",
+        "elementType": "geometry",
+        "stylers": [{ "color": "#000000" }]
+    }
+];
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.sm,
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md,
+    map: {
+        width: '100%',
+        height: '100%',
+    },
+    headerOverlay: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+    },
+    headerBlur: {
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.sm,
+        borderRadius: BORDER_RADIUS.lg,
+        borderLeftWidth: 3,
+        borderLeftColor: COLORS.neonCyan,
     },
     headerTitle: {
         fontSize: 24,
-        fontWeight: 'bold',
+        fontWeight: '900',
         color: COLORS.textPrimary,
+        letterSpacing: 2,
     },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
+    signalBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.md,
+        backgroundColor: COLORS.neonCyan,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginTop: 4,
+        alignSelf: 'flex-start',
+        gap: 4,
+    },
+    signalText: {
+        color: COLORS.background,
+        fontSize: 10,
+        fontWeight: 'bold',
     },
     loadingText: {
-        color: COLORS.textSecondary,
-        fontSize: 16,
+        color: COLORS.neonCyan,
+        marginTop: SPACING.md,
+        letterSpacing: 1,
     },
-    errorContainer: {
-        flex: 1,
+    shardContainer: {
+        width: 50,
+        height: 50,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        gap: SPACING.md,
     },
-    errorText: {
-        color: COLORS.textPrimary,
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    errorSubtext: {
-        color: COLORS.textSecondary,
-        fontSize: 14,
-        textAlign: 'center',
-    },
-    mapContainer: {
-        flex: 1,
-        margin: SPACING.md,
-        borderRadius: BORDER_RADIUS.xl,
+    shardOuter: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: COLORS.neonCyan,
         backgroundColor: COLORS.surface,
+        ...SHADOWS.neonCyan,
     },
-    mapBackground: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
+    shardCollected: {
+        borderColor: COLORS.success,
+        opacity: 0.8,
     },
-    gridLine: {
+    shardImage: {
+        width: '100%',
+        height: '100%',
+    },
+    shardIconOverlay: {
         position: 'absolute',
-        backgroundColor: COLORS.surfaceLight,
-    },
-    gridLineHorizontal: {
-        left: 0,
-        right: 0,
-        height: 1,
-    },
-    gridLineVertical: {
-        top: 0,
         bottom: 0,
-        width: 1,
+        right: 0,
+        backgroundColor: COLORS.neonCyan,
+        borderTopLeftRadius: 8,
+        padding: 2,
     },
-    userMarker: {
-        alignItems: 'center',
-        zIndex: 10,
-    },
-    userMarkerPulse: {
-        position: 'absolute',
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: COLORS.neonCyanDim,
-        opacity: 0.3,
-    },
-    userMarkerDot: {
+    userMarkerOut: {
         width: 20,
         height: 20,
         borderRadius: 10,
-        backgroundColor: COLORS.neonCyan,
-        borderWidth: 3,
-        borderColor: COLORS.background,
-    },
-    youLabel: {
-        color: COLORS.neonCyan,
-        fontSize: 12,
-        fontWeight: '600',
-        marginTop: SPACING.xs,
-    },
-    nearbyUserMarker: {
-        position: 'absolute',
-        alignItems: 'center',
-    },
-    nearbyUserDot: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: COLORS.electricMagenta,
-        borderWidth: 2,
-        borderColor: COLORS.background,
-    },
-    nearbyUserName: {
-        color: COLORS.textPrimary,
-        fontSize: 11,
-        fontWeight: '500',
-        marginTop: 2,
-    },
-    nearbyUserDistance: {
-        color: COLORS.textMuted,
-        fontSize: 10,
-    },
-    noMatchesOverlay: {
-        position: 'absolute',
-        bottom: SPACING.xl,
-        left: SPACING.lg,
-        right: SPACING.lg,
-        backgroundColor: COLORS.surfaceLight,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.lg,
-        alignItems: 'center',
-        gap: SPACING.sm,
-    },
-    noMatchesText: {
-        color: COLORS.textPrimary,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    noMatchesSubtext: {
-        color: COLORS.textSecondary,
-        fontSize: 13,
-        textAlign: 'center',
-    },
-    locationInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        backgroundColor: 'rgba(255, 0, 255, 0.3)',
         justifyContent: 'center',
-        gap: SPACING.xs,
-        paddingVertical: SPACING.md,
-        marginBottom: 80, // Account for tab bar
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.electricMagenta,
     },
-    locationText: {
-        color: COLORS.textMuted,
+    userMarkerIn: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: COLORS.electricMagenta,
+    },
+    footerOverlay: {
+        position: 'absolute',
+        bottom: 110, // Above Tab Bar
+        alignSelf: 'center',
+        paddingHorizontal: SPACING.lg,
+        paddingVertical: SPACING.sm,
+        backgroundColor: 'rgba(10,10,10,0.8)',
+        borderRadius: BORDER_RADIUS.full,
+        borderWidth: 1,
+        borderColor: COLORS.surfaceLight,
+    },
+    footerText: {
+        color: COLORS.textSecondary,
         fontSize: 12,
-    },
+        letterSpacing: 1,
+    }
 });
 
 export default MapScreen;

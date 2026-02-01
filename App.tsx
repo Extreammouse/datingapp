@@ -3,6 +3,7 @@ import { StatusBar, LogBox } from 'react-native';
 import { NavigationContainer, DefaultTheme, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS } from './src/constants/theme';
 import { RootStackParamList } from './src/types';
 
@@ -17,7 +18,8 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ChatScreenWrapper } from './src/screens/ChatScreenWrapper';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
-import { GameSelectionScreen } from './src/screens/GameSelectionScreen';
+import { GameWrapperScreen } from './src/screens/GameWrapperScreen';
+import { GameGauntletScreen } from './src/screens/GameGauntletScreen';
 
 // Services
 import { staminaService } from './src/services/StaminaService';
@@ -50,14 +52,7 @@ const DatingAppTheme = {
 
 // Main Tabs wrapper component
 const MainTabsScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const handleCenterPress = () => {
-    // Navigate to game selection when + button is pressed
-    navigation.navigate('GameSelection', { partnerId: 'demo_partner' });
-  };
-
-  return <BottomTabNavigator onCenterPress={handleCenterPress} />;
+  return <BottomTabNavigator />;
 };
 
 export default function App() {
@@ -108,107 +103,119 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={COLORS.background}
-        translucent={false}
-      />
-      <NavigationContainer theme={DatingAppTheme}>
-        <Stack.Navigator
-          initialRouteName={hasProfile ? 'MainTabs' : 'ProfileSetup'}
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_right',
-            animationDuration: 300,
-            contentStyle: {
-              backgroundColor: COLORS.background,
-            },
-          }}
-        >
-          {/* Profile Setup - First time user onboarding */}
-          <Stack.Screen
-            name="ProfileSetup"
-            component={ProfileSetupScreen}
-            options={{
-              animation: 'fade',
-            }}
-          />
-
-          {/* Main Tabs - Bottom tab navigation */}
-          <Stack.Screen
-            name="MainTabs"
-            component={MainTabsScreen}
-            options={{
-              animation: 'fade',
-            }}
-          />
-
-          {/* Settings Screen */}
-          <Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{
+      <SafeAreaProvider>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={COLORS.background}
+          translucent={false}
+        />
+        <NavigationContainer theme={DatingAppTheme}>
+          <Stack.Navigator
+            initialRouteName={hasProfile ? 'MainTabs' : 'ProfileSetup'}
+            screenOptions={{
+              headerShown: false,
               animation: 'slide_from_right',
+              animationDuration: 300,
+              contentStyle: {
+                backgroundColor: COLORS.background,
+              },
             }}
-          />
+          >
+            {/* Profile Setup - First time user onboarding */}
+            <Stack.Screen
+              name="ProfileSetup"
+              component={ProfileSetupScreen}
+              options={{
+                animation: 'fade',
+              }}
+            />
 
-          {/* Chat Screen */}
-          <Stack.Screen
-            name="Chat"
-            component={ChatScreenWrapper}
-            options={{
-              animation: 'slide_from_right',
-            }}
-          />
+            {/* Main Tabs - Bottom tab navigation */}
+            <Stack.Screen
+              name="MainTabs"
+              component={MainTabsScreen}
+              options={{
+                animation: 'fade',
+              }}
+            />
 
-          {/* Game Selection */}
-          <Stack.Screen
-            name="GameSelection"
-            component={GameSelectionScreen}
-            options={{
-              animation: 'slide_from_bottom',
-              presentation: 'modal',
-            }}
-          />
+            {/* Settings Screen */}
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
 
-          {/* Game Screens */}
-          <Stack.Screen
-            name="TugOfWar"
-            component={TugOfWarScreen}
-            options={{
-              animation: 'slide_from_bottom',
-              gestureEnabled: false, // Prevent accidental back during game
-            }}
-          />
+            {/* Chat Screen */}
+            <Stack.Screen
+              name="Chat"
+              component={ChatScreenWrapper}
+              options={{
+                animation: 'slide_from_right',
+              }}
+            />
 
-          <Stack.Screen
-            name="SyncGrid"
-            component={SyncGridScreen}
-            options={{
-              animation: 'slide_from_bottom',
-              gestureEnabled: false,
-            }}
-          />
+            {/* Game Selection / Wrapper */}
+            <Stack.Screen
+              name="GameSelection"
+              component={GameWrapperScreen}
+              options={{
+                animation: 'slide_from_bottom',
+                presentation: 'modal',
+              }}
+            />
 
-          <Stack.Screen
-            name="FrequencySync"
-            component={FrequencySyncScreen}
-            options={{
-              animation: 'slide_from_bottom',
-              gestureEnabled: false,
-            }}
-          />
+            {/* Game Screens */}
+            <Stack.Screen
+              name="TugOfWar"
+              component={TugOfWarScreen}
+              options={{
+                animation: 'slide_from_bottom',
+                gestureEnabled: false, // Prevent accidental back during game
+              }}
+            />
 
-          {/* Profile Screen (other user's profile) */}
-          <Stack.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{
-              animation: 'fade_from_bottom',
-            }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+            <Stack.Screen
+              name="SyncGrid"
+              component={SyncGridScreen}
+              options={{
+                animation: 'slide_from_bottom',
+                gestureEnabled: false,
+              }}
+            />
+
+            <Stack.Screen
+              name="FrequencySync"
+              component={FrequencySyncScreen}
+              options={{
+                animation: 'slide_from_bottom',
+                gestureEnabled: false,
+              }}
+            />
+
+            {/* Game Gauntlet */}
+            <Stack.Screen
+              name="GameGauntlet"
+              component={GameGauntletScreen}
+              options={{
+                animation: 'fade',
+                gestureEnabled: false,
+              }}
+            />
+
+            {/* Profile Screen (other user's profile) */}
+            <Stack.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{
+                animation: 'fade_from_bottom',
+              }}
+            />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

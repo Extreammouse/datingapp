@@ -59,13 +59,11 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
     const [revealedTags, setRevealedTags] = useState<BioTag[]>([]);
     const [milestoneReached, setMilestoneReached] = useState<number[]>([]);
     const [gameEnded, setGameEnded] = useState(false);
-    const [selectedDirection, setSelectedDirection] = useState<'left' | 'right' | null>(
-        userGender === 'male' ? 'left' : userGender === 'female' ? 'right' : null
-    );
+    const [selectedDirection, setSelectedDirection] = useState<'left' | 'right' | null>(null);
 
     // Determine pull direction based on gender:
-    // Male = left (pulling opponent towards them from right)
-    // Female = right (pulling opponent towards them from left)
+    // Male = right arrow
+    // Female = left arrow
     // Other = user chooses
     const pullDirection = selectedDirection;
 
@@ -89,15 +87,23 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
             }
         });
 
-        // Check for win condition
-        if (Math.abs(position) >= 1 && !gameEnded) {
-            setGameEnded(true);
-            const won = position < 0; // Negative means you pulled to your side
-            Haptics.notificationAsync(
-                won ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
-            );
-            onGameComplete(won, revealedTags);
+        setGameEnded(true);
+        const won = position < 0; // Negative means you pulled to your side
+
+        if (won) {
+            // Heartbeat-like haptic sequence
+            const triggerHeartbeat = async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                setTimeout(async () => {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                }, 150); // Pause for heartbeat rhythm
+            };
+            triggerHeartbeat();
+        } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         }
+
+        onGameComplete(won, revealedTags);
     }, [milestoneReached, bioTags, revealedTags, gameEnded, onGameComplete]);
 
     // Handle socket events
@@ -288,19 +294,57 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
                 </Text>
             </View>
 
-            {/* Single Pull Button - Tap rapidly to pull them towards you */}
-            <AnimatedPressable
-                style={[styles.pullButton, leftButtonAnimatedStyle]}
-                onPress={() => handleTug('left')}
-                disabled={gameEnded}
-            >
-                <View style={styles.pullButtonInner}>
-                    <ChevronLeft size={40} color={COLORS.neonCyan} />
-                    <ChevronLeft size={40} color={COLORS.neonCyan} style={styles.doubleArrowLarge} />
-                    <Text style={styles.pullButtonText}>PULL</Text>
+            {/* Gender Specific Pull Buttons */}
+            {pullDirection === 'left' && (
+                <AnimatedPressable
+                    style={[styles.pullButton, leftButtonAnimatedStyle]}
+                    onPress={() => handleTug('left')}
+                    disabled={gameEnded}
+                >
+                    <View style={styles.pullButtonInner}>
+                        <ChevronLeft size={40} color={COLORS.neonCyan} />
+                        <ChevronLeft size={40} color={COLORS.neonCyan} style={styles.doubleArrowLarge} />
+                        <Text style={styles.pullButtonText}>PULL</Text>
+                    </View>
+                    <Text style={styles.pullHint}>Tap rapidly!</Text>
+                </AnimatedPressable>
+            )}
+
+            {pullDirection === 'right' && (
+                <AnimatedPressable
+                    style={[styles.pullButton, rightButtonAnimatedStyle]}
+                    onPress={() => handleTug('right')}
+                    disabled={gameEnded}
+                >
+                    <View style={styles.pullButtonInner}>
+                        <Text style={[styles.pullButtonText, { marginRight: SPACING.sm, marginLeft: 0 }]}>PULL</Text>
+                        <ChevronRight size={40} color={COLORS.electricMagenta} style={[styles.doubleArrowLarge, { marginLeft: 0, marginRight: -24 }]} />
+                        <ChevronRight size={40} color={COLORS.electricMagenta} />
+                    </View>
+                    <Text style={styles.pullHint}>Tap rapidly!</Text>
+                </AnimatedPressable>
+            )}
+
+            {!pullDirection && (
+                <View style={styles.buttonContainer}>
+                    <AnimatedPressable
+                        style={[styles.tugButton, styles.leftButton, leftButtonAnimatedStyle]}
+                        onPress={() => setSelectedDirection('left')}
+                        disabled={gameEnded}
+                    >
+                        <ChevronLeft size={32} color={COLORS.neonCyan} />
+                        <Text style={[styles.buttonText, { color: COLORS.neonCyan }]}>LEFT</Text>
+                    </AnimatedPressable>
+                    <AnimatedPressable
+                        style={[styles.tugButton, styles.rightButton, rightButtonAnimatedStyle]}
+                        onPress={() => setSelectedDirection('right')}
+                        disabled={gameEnded}
+                    >
+                        <ChevronRight size={32} color={COLORS.electricMagenta} />
+                        <Text style={[styles.buttonText, { color: COLORS.electricMagenta }]}>RIGHT</Text>
+                    </AnimatedPressable>
                 </View>
-                <Text style={styles.pullHint}>Tap rapidly to pull them to you!</Text>
-            </AnimatedPressable>
+            )}
 
             {/* Game ended overlay with Open Chat button */}
             {gameEnded && (
@@ -319,7 +363,7 @@ export const TugOfWar: React.FC<TugOfWarProps> = ({
                         }}
                     >
                         <MessageCircle size={20} color={COLORS.background} />
-                        <Text style={styles.connectButtonText}>Open Chat</Text>
+                        <Text style={styles.connectButtonText}>Message</Text>
                     </Pressable>
                 </View>
             )}

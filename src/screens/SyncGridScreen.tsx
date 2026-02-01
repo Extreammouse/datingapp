@@ -10,6 +10,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ArrowLeft } from 'lucide-react-native';
 import { COLORS, SPACING } from '../constants/theme';
 import { RootStackParamList } from '../types';
+import { GameInstructionsModal } from '../components/modals/GameInstructionsModal';
+import { useGameInstructions } from '../hooks/useGameInstructions';
+import { Grid3X3 } from 'lucide-react-native';
 import { SyncGrid } from '../components/games/SyncGrid';
 import { staminaService } from '../services/StaminaService';
 
@@ -17,22 +20,23 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SyncGrid'>;
 
 export const SyncGridScreen: React.FC<Props> = ({ navigation, route }) => {
     const { roomId, partnerId } = route.params;
-    const [gameCompleted, setGameCompleted] = useState(false);
+    const [matchCount, setMatchCount] = useState(0);
+    const { showInstructions, dismissInstructions } = useGameInstructions('syncGrid');
 
-    const handleGameComplete = useCallback(async (matchCount: number) => {
-        setGameCompleted(true);
+    const handleOpenChat = useCallback(() => {
+        navigation.replace('Chat', {
+            matchId: partnerId,
+            matchName: 'Match', // ideally fetch name
+            matchImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        });
+    }, [navigation, partnerId]);
 
-        // Record game in stamina
-        const result = matchCount >= 5 ? 'win' : matchCount >= 3 ? 'draw' : 'loss';
-        await staminaService.recordGame('syncGrid', partnerId, result);
-
-        // Navigate to profile after delay
-        setTimeout(() => {
-            navigation.replace('Profile', {
-                userId: partnerId,
-                revealed: matchCount >= 5,
-            });
-        }, 2000);
+    const handleGameComplete = useCallback(async (matches: number) => {
+        navigation.replace('Chat', {
+            matchId: partnerId,
+            matchName: 'Match', // ideally fetch name
+            matchImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        });
     }, [navigation, partnerId]);
 
     const handleBack = () => {
@@ -48,14 +52,22 @@ export const SyncGridScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Pressable>
                 <Text style={styles.title}>Sync Grid</Text>
                 <View style={styles.placeholder} />
+                {/* Game Instructions */}
+                <GameInstructionsModal
+                    visible={showInstructions}
+                    onClose={dismissInstructions}
+                    title="Sync Grid"
+                    description="Tap the highlighted tiles to match the pattern. Sync up with your partner to clear the blur!"
+                    icon={<Grid3X3 size={32} color={COLORS.neonCyan} />}
+                />
             </View>
-
             {/* Game */}
             <SyncGrid
                 roomId={roomId}
                 partnerId={partnerId}
                 partnerImage="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400"
                 onGameComplete={handleGameComplete}
+                onOpenChat={handleOpenChat}
             />
         </SafeAreaView>
     );
